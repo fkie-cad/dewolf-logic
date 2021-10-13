@@ -98,18 +98,27 @@ class TestBitwiseAnd:
             w.simplify()
             assert World.compare(w.get_definition(w.variable("v", 8)), w.from_string("(| c@8 (& (| x@8 d@8) a@8 b@8))"))
 
-        def test_associative_folding_2(self):
-            """(a xor b) & (a xor b xor c) = (a xor b)"""
-            w = World()
-            w.define(
-                w.variable("v", 8),
-                w.bitwise_and(
-                    w.bitwise_xor(w.variable("a", 8), w.variable("b", 8)),
-                    w.bitwise_xor(w.variable("a", 8), w.variable("b", 8), w.variable("c", 8)),
-                ),
-            )
-            w.simplify()
-            assert World.compare(w.get_definition(w.variable("v", 8)), w.bitwise_xor(w.variable("a", 8), w.variable("b", 8)))
+        # This simplification is not correct:
+        # a xor b = (a | b) & ~(a & b), but
+        # (a xor b) & (a xor b xor c) = (a | b) & ~(a & b) & ( (a xor b) | c) & ~( (a xor b) & c)
+        #   = (a | b) & ~(a & b) & ( ((a | b) & ~(a & b)) | c) & ~( ((a | b) & ~(a & b)) & c)
+        #   = (a | b) & (~a | ~b) & ( ((a | b) & (~a | ~b)) | c) & ( (~a & ~b) | (a & b) | ~c)
+        #   = (a | b) & (~a | ~b) & (a | b | c) & (~a | ~b | c) & ( (~a & ~b) | (a & b) | ~c)
+        #   = (a | b) & (~a | ~b) & ( (~a & ~b) | (a & b) | ~c)
+        #   = (a | b) & (~a | ~b) & ~c
+        #   = (a xor b) & ~c
+        # def test_associative_folding_2(self):
+        #     """(a xor b) & (a xor b xor c) = (a xor b)"""
+        #     w = World()
+        #     w.define(
+        #         w.variable("v", 8),
+        #         w.bitwise_and(
+        #             w.bitwise_xor(w.variable("a", 8), w.variable("b", 8)),
+        #             w.bitwise_xor(w.variable("a", 8), w.variable("b", 8), w.variable("c", 8)),
+        #         ),
+        #     )
+        #     w.simplify()
+        #     assert World.compare(w.get_definition(w.variable("v", 8)), w.bitwise_xor(w.variable("a", 8), w.variable("b", 8)))
 
         def test_associative_folding_3(self):
             """(a | b) & (c | a | b) = (a | b)"""
@@ -221,6 +230,13 @@ class TestBitwiseOr:
             w.simplify()
             assert World.compare(w.get_definition(w.variable("v", 8)), w.variable("x", 8))
 
+        def test_variable_folding_multiple_times(self):
+            """z | x | (x & y & z) = x | z"""
+            w = World()
+            w.define(w.variable("v", 8), w.from_string("(| z@8 y@8 (& x@8 y@8 z@8))"))
+            w.simplify()
+            assert World.compare(w.get_definition(w.variable("v", 8)), w.from_string("(| z@8 y@8)"))
+
         def test_xor_folding(self):
             """x | (x ^ y) = x | y"""
             w = World()
@@ -311,6 +327,14 @@ class TestBitwiseOr:
                 w.get_definition(w.variable("v", 8)),
                 w.bitwise_or(w.bitwise_and(w.variable("a", 8), w.variable("c", 8)), w.variable("b", 8)),
             )
+
+        def test_associative_folding_multiple(self):
+            """((~x1 & x2 & ~x3 & x5) | (x3 | ~x2 | x1 | ~x5)) = True"""
+            w = World()
+            term = w.from_string("(| (& (~ x1@1) x2@1 (~ x3@1) x5@1) (| x3@1 (~ x2@1) x1@1 (~ x5@1)) )")
+            w.define(var := w.variable("v", 1), term)
+            w.simplify()
+            assert World.compare(w.get_definition(var), Constant(w, 1, 1))
 
         @pytest.mark.skip(reason="Not implemented yet, may be complicated")
         def test_associative_folding_4(self):
@@ -468,6 +492,49 @@ class TestBitwiseNegate:
         negation = w.from_string("(~v@4)")
         with pytest.raises(ValueError):
             negation.add_operand(w.from_string("t@2"))
+
+    @pytest.mark.parametrize(
+        "term, result",
+        [
+            ("(~1@1)", "0@1"),
+            ("(~0@1)", "1@1"),
+            ("(~0@3)", "-1@3"),
+            ("(~1@3)", "-2@3"),
+            ("(~2@3)", "-3@3"),
+            ("(~3@3)", "-4@3"),
+            ("(~4@3)", "3@3"),
+            ("(~5@3)", "2@3"),
+            ("(~6@3)", "1@3"),
+            ("(~7@3)", "0@3"),
+        ],
+    )
+    def test_eval_negate_constants(self, term, result):
+        w = World()
+        term = w.from_string(term)  # type: BitwiseNegate
+        constant = term.eval(term.operands)
+        assert w.compare(constant, w.from_string(result))
+
+    @pytest.mark.parametrize(
+        "term, result",
+        [
+            ("(~1@1)", "0@1"),
+            ("(~0@1)", "1@1"),
+            ("(~0@3)", "-1@3"),
+            ("(~1@3)", "-2@3"),
+            ("(~2@3)", "-3@3"),
+            ("(~3@3)", "-4@3"),
+            ("(~4@3)", "3@3"),
+            ("(~5@3)", "2@3"),
+            ("(~6@3)", "1@3"),
+            ("(~7@3)", "0@3"),
+        ],
+    )
+    def test_collapse_constants(self, term, result):
+        w = World()
+        term = w.from_string(term)  # type: BitwiseNegate
+        w.define(var := w.variable("v", 1), term)
+        term.collapse()
+        assert w.compare(var, w.from_string(result))
 
 
 class TestNegation:

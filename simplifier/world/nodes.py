@@ -107,6 +107,16 @@ class BaseVariable(BitVector, ABC):
         """Invoke the appropriate visitor for Variable."""
         return visitor.visit_variable(self)
 
+    def simplify(self):
+        """Simplify the term defined by the variable."""
+        from simplifier.operations import BitwiseNegate
+
+        for node in list(self.world.iter_postorder(self)):
+            if isinstance(node, BitwiseNegate):
+                node.dissolve_negation()
+        for node in list(self.world.iter_postorder(self)):
+            if isinstance(node, Operation):
+                node.simplify()
 
 class Variable(BaseVariable):
     """Class representing a Variable in a World instance."""

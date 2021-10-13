@@ -10,7 +10,7 @@ from simplifier.operations.bitwise import *
 from simplifier.operations.boolean import *
 from simplifier.parser import grammar
 from simplifier.world.interface import WorldInterface
-from simplifier.world.nodes import Constant, TmpVariable, Variable, WorldObject
+from simplifier.world.nodes import BaseVariable, Constant, TmpVariable, Variable, WorldObject
 
 
 class World(WorldInterface):
@@ -30,6 +30,7 @@ class World(WorldInterface):
         The transformer TreeInWorld is specific to the legal operations on World.
         """
         self._parser = grammar(TreeInWorld(self))
+        self.variable_name_counter = 0
         super().__init__(*args, **kwargs)
 
     def variable(self, name: str, size: Optional[int] = None) -> Variable:
@@ -62,6 +63,12 @@ class World(WorldInterface):
         constant = Constant(self, value, size)
         self._graph.add_node(constant)
         return constant
+
+    def new_variable(self, size: int, tmp: bool = False) -> BaseVariable:
+        self.variable_name_counter += 1
+        if tmp:
+            return self.tmp_variable(f"tmp_var_{self.variable_name_counter}", size)
+        return self.variable(f"var_{self.variable_name_counter}", size)
 
     # arithmetic operations
 

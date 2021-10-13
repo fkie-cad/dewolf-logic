@@ -2,6 +2,7 @@
 import logging
 from typing import Dict, Iterable, Iterator, List, Optional, TypeVar
 
+from simplifier.operations.interface import CommutativeOperation
 from simplifier.world.coloring import GraphColoringGenerator
 from simplifier.world.edges import DefinitionEdge, OperandEdge, WorldRelation
 from simplifier.world.graphs import Graph
@@ -36,6 +37,69 @@ class WorldInterface:
         """
         self._graph = Graph()
         self._variables: Dict[str, BaseVariable] = dict()
+
+    # def clone_from(self, world_object: WorldObject) -> WorldObject:
+    #     """Copy the world to a new world."""
+    #     old_world = world_object.world
+    #     node_mapping: Dict[WorldObject, WorldObject] = dict()
+    #     for node in old_world.iter_postorder(world_object):
+    #         new_node = node.copy()
+    #         new_node._world = self
+    #         self._graph.add_node(new_node)
+    #         node_mapping[node] = new_node
+    #         if isinstance(new_node, Variable):
+    #             self._variables[new_node.name] = new_node
+    #         for edge in old_world._graph.get_out_edges(node):
+    #             self._graph.add_edge(edge.copy(node_mapping[edge.source], node_mapping[edge.sink]))
+    #     return node_mapping[world_object]
+
+    def free_world_condition(self, condition: WorldObject):
+        """
+        Copy operations such that each has only in-degree 1.
+
+        If a condition is given, do it only for this condition, otherwise for the hole world.
+        """
+        in_degree_larger_one_operations = set()
+        condition_nodes = set()
+        for node in self.iter_postorder(condition):
+            if isinstance(node, Operation) and self._graph.in_degree(node) > 1:
+                in_degree_larger_one_operations.add(node)
+            condition_nodes.add(node)
+
+        while in_degree_larger_one_operations:
+            operation = in_degree_larger_one_operations.pop()
+            operand_edges = self._graph.get_out_edges(operation)
+            relations = {relation for relation in self._graph.get_in_edges(operation)[1:] if relation.source in condition_nodes}
+            condition_nodes.remove(operation)
+            for in_relation in relations:
+                copy_node = operation.copy()
+                condition_nodes.add(copy_node)
+                for relation in operand_edges:
+                    self._graph.add_edge(relation.copy(source=copy_node))
+                    if self._graph.in_degree(relation.sink) > 1:
+                        in_degree_larger_one_operations.add(relation.sink)
+                self._graph.substitute_edge(in_relation, in_relation.copy(sink=copy_node))
+
+    def free_world_conditions(self):
+        """
+        Copy operations such that each has only in-degree 1.
+
+        If a condition is given, do it only for this condition, otherwise for the hole world.
+        """
+        in_degree_larger_one_operations = {
+            node for node in self.iter_postorder() if isinstance(node, Operation) and self._graph.in_degree(node) > 1
+        }
+        while in_degree_larger_one_operations:
+            operation = in_degree_larger_one_operations.pop()
+            operand_edges = self._graph.get_out_edges(operation)
+            for in_relation in self._graph.get_in_edges(operation)[1:]:
+                copy_node = operation.copy()
+                for relation in operand_edges:
+                    self._graph.add_edge(relation.copy(source=copy_node))
+                    if self._graph.in_degree(relation.sink) > 1:
+                        in_degree_larger_one_operations.add(relation.sink)
+                self._graph.substitute_edge(in_relation, in_relation.copy(sink=copy_node))
+>>>>>>> bc8c5d0 (changes for integration)
 
     def __len__(self) -> int:
         """Return the number of WorldObjects."""
@@ -150,7 +214,6 @@ class WorldInterface:
             return True
         if a != b and not _contains_defining_variable(a, b):
             return False
-
         graph_coloring_generator = GraphColoringGenerator()
         graph_coloring_generator.color_subtree_with_head(a)
         graph_coloring_generator.color_subtree_with_head(b)

@@ -1,4 +1,6 @@
 """Module testing world functions."""
+from itertools import combinations, product
+
 import pytest
 
 from simplifier.world.nodes import TmpVariable, Variable
@@ -251,3 +253,60 @@ class TestCleanUp:
         w.cleanup()
         cmp_w = World()
         assert w.compare(w.from_string("v"), cmp_w.from_string(shared_operand)) and len(w) == numb_vertices + 1
+
+
+class TestFreeConditions:
+    @pytest.mark.parametrize("condition", ["2@8", "z@8"])
+    def test_nothing_for_literals(self, condition):
+        w = World()
+        cond = w.from_string(condition)
+        w.define(w.variable("u", 8), cond)
+        w.define(w.variable("v", 8), cond)
+        w.free_world_conditions()
+        assert len(w) == 3
+
+    @pytest.mark.parametrize("condition", ["(& z@3 2@3)", "(| (& z@3 2@3 y@3) 5@3 a@3)"])
+    def test_split_top_operation_two_variables(self, condition):
+        w = World()
+        cond = w.from_string(condition)
+        w.define(var_u := w.variable("u", 8), cond)
+        w.define(var_v := w.variable("v", 8), cond)
+        assert hash(w.get_definition(var_u)) == hash(w.get_definition(var_v))
+        w.free_world_conditions()
+        assert hash(w.get_definition(var_u)) != hash(w.get_definition(var_v))
+
+    @pytest.mark.parametrize("condition", ["(& z@3 2@3)", "(| (& z@3 2@3 y@3) 5@3 a@3)"])
+    def test_split_top_operation_four_variables(self, condition):
+        w = World()
+        cond = w.from_string(condition)
+        w.define(var_u := w.variable("u", 8), cond)
+        w.define(var_v := w.variable("v", 8), cond)
+        w.define(var_w := w.variable("w", 8), cond)
+        w.define(var_x := w.variable("x", 8), cond)
+        assert all(
+            hash(w.get_definition(var_1)) == hash(w.get_definition(var_2)) for var_1, var_2 in combinations((var_u, var_v, var_w, var_x), 2)
+        )
+        w.free_world_conditions()
+        assert all(
+            hash(w.get_definition(var_1)) != hash(w.get_definition(var_2)) for var_1, var_2 in combinations((var_u, var_v, var_w, var_x), 2)
+        )
+
+    def test_split_operations(self):
+        w = World()
+        cond1 = w.from_string("(& z@3 2@3)")
+        cond2 = w.from_string("(| (& z@3 2@3 y@3) 5@3 a@3)")
+        or_cond = w.bitwise_or(w.from_string("a@3"), cond1)
+        and_cond = w.bitwise_and(cond1, cond2)
+        neg_cond = w.bitwise_negate(cond2)
+        and_con2 = w.bitwise_and(cond2, or_cond)
+        w.define(var := w.variable("v", 8), or_cond)
+        assert w._graph.in_degree(or_cond) == 2 and w._graph.in_degree(cond1) == 2 and w._graph.in_degree(cond2) == 3
+        numb_nodes = len(w)
+        w.free_world_conditions()
+        assert len(w) == numb_nodes + 4
+        assert hash(w.get_definition(var)) != hash(and_con2.operands[1]) and str(w.get_definition(var)) == str(and_con2.operands[1])
+        assert hash(and_cond.operands[0]) != hash(or_cond.operands[1]) and str(and_cond.operands[0]) == str(or_cond.operands[1])
+        assert hash(and_cond.operands[1]) != hash(neg_cond.operand) and str(and_cond.operands[1]) == str(neg_cond.operand)
+        assert hash(and_cond.operands[1]) != hash(and_con2.operands[0]) and str(and_cond.operands[1]) == str(and_con2.operands[0])
+        assert hash(and_con2.operands[0]) != hash(neg_cond.operand) and str(and_con2.operands[0]) == str(neg_cond.operand)
+>>>>>>> bc8c5d0 (changes for integration)
