@@ -38,21 +38,6 @@ class WorldInterface:
         self._graph = Graph()
         self._variables: Dict[str, BaseVariable] = dict()
 
-    # def clone_from(self, world_object: WorldObject) -> WorldObject:
-    #     """Copy the world to a new world."""
-    #     old_world = world_object.world
-    #     node_mapping: Dict[WorldObject, WorldObject] = dict()
-    #     for node in old_world.iter_postorder(world_object):
-    #         new_node = node.copy()
-    #         new_node._world = self
-    #         self._graph.add_node(new_node)
-    #         node_mapping[node] = new_node
-    #         if isinstance(new_node, Variable):
-    #             self._variables[new_node.name] = new_node
-    #         for edge in old_world._graph.get_out_edges(node):
-    #             self._graph.add_edge(edge.copy(node_mapping[edge.source], node_mapping[edge.sink]))
-    #     return node_mapping[world_object]
-
     def free_world_condition(self, condition: WorldObject):
         """
         Copy operations such that each has only in-degree 1.
@@ -99,7 +84,6 @@ class WorldInterface:
                     if self._graph.in_degree(relation.sink) > 1:
                         in_degree_larger_one_operations.add(relation.sink)
                 self._graph.substitute_edge(in_relation, in_relation.copy(sink=copy_node))
->>>>>>> bc8c5d0 (changes for integration)
 
     def __len__(self) -> int:
         """Return the number of WorldObjects."""

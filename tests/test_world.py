@@ -309,4 +309,3 @@ class TestFreeConditions:
         assert hash(and_cond.operands[1]) != hash(neg_cond.operand) and str(and_cond.operands[1]) == str(neg_cond.operand)
         assert hash(and_cond.operands[1]) != hash(and_con2.operands[0]) and str(and_cond.operands[1]) == str(and_con2.operands[0])
         assert hash(and_con2.operands[0]) != hash(neg_cond.operand) and str(and_con2.operands[0]) == str(neg_cond.operand)
->>>>>>> bc8c5d0 (changes for integration)

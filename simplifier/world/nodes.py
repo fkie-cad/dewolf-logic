@@ -118,6 +118,7 @@ class BaseVariable(BitVector, ABC):
             if isinstance(node, Operation):
                 node.simplify()
 
+
 class Variable(BaseVariable):
     """Class representing a Variable in a World instance."""
 
