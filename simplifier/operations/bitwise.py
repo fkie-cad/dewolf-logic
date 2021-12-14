@@ -383,7 +383,7 @@ class BitwiseOr(BitwiseOperation, CommutativeOperation, AssociativeOperation):
         ):
             return False
         negated_term_2 = term2.operand if isinstance(term2, BitwiseNegate) else self.world.bitwise_negate(term2)
-        negated_term_2_resolved = negated_term_2.copy_tree().dissolve_negation() if isinstance(negated_term_2, BitwiseNegate) else None
+        negated_term_2_resolved = negated_term_2.copy_tree().dissolve_negation() if isinstance(negated_term_2, BitwiseNegate) else None  # type: ignore
         for operand in term1.operands:
             if self.world.compare(operand, negated_term_2) or self.world.compare(operand, negated_term_2_resolved):
                 if isinstance(term1, BitwiseAnd):
@@ -417,7 +417,7 @@ class BitwiseOr(BitwiseOperation, CommutativeOperation, AssociativeOperation):
                     unique_term_2.operand if isinstance(unique_term_2, BitwiseNegate) else self.world.bitwise_negate(unique_term_2)
                 )
                 negated_term_2_resolved = (
-                    negated_term_2.copy_tree().dissolve_negation() if isinstance(negated_term_2, BitwiseNegate) else None
+                    negated_term_2.copy_tree().dissolve_negation() if isinstance(negated_term_2, BitwiseNegate) else None  # type: ignore
                 )
                 if self.world.compare(unique_term_1, negated_term_2) or self.world.compare(unique_term_1, negated_term_2_resolved):
                     self.world.remove_operand(self, term1)

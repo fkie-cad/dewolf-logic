@@ -40,7 +40,7 @@ class WorldInterface:
 
     def free_world_condition(self, condition: WorldObject):
         """
-        Copy operations such that each has only in-degree 1.
+        Copy operations such that each node of the condition has only in-degree 1.
 
         If a condition is given, do it only for this condition, otherwise for the hole world.
         """
@@ -67,7 +67,7 @@ class WorldInterface:
 
     def free_world_conditions(self):
         """
-        Copy operations such that each has only in-degree 1.
+        Copy operations such that each node has only in-degree 1.
 
         If a condition is given, do it only for this condition, otherwise for the hole world.
         """

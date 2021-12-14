@@ -3,7 +3,7 @@ from itertools import combinations, product
 
 import pytest
 
-from simplifier.world.nodes import TmpVariable, Variable
+from simplifier.world.nodes import Operation, TmpVariable, Variable
 from simplifier.world.world import World
 
 
@@ -303,7 +303,8 @@ class TestFreeConditions:
         assert w._graph.in_degree(or_cond) == 2 and w._graph.in_degree(cond1) == 2 and w._graph.in_degree(cond2) == 3
         numb_nodes = len(w)
         w.free_world_conditions()
-        assert len(w) == numb_nodes + 4
+        assert len(w) == numb_nodes + 7
+        assert all(w._graph.in_degree(node) <= 1 for node in w.iter_postorder() if isinstance(node, Operation))
         assert hash(w.get_definition(var)) != hash(and_con2.operands[1]) and str(w.get_definition(var)) == str(and_con2.operands[1])
         assert hash(and_cond.operands[0]) != hash(or_cond.operands[1]) and str(and_cond.operands[0]) == str(or_cond.operands[1])
         assert hash(and_cond.operands[1]) != hash(neg_cond.operand) and str(and_cond.operands[1]) == str(neg_cond.operand)

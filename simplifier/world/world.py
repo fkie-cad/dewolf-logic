@@ -65,6 +65,7 @@ class World(WorldInterface):
         return constant
 
     def new_variable(self, size: int, tmp: bool = False) -> BaseVariable:
+        """Generate a new variable of given size. Depending on the tmp flag it is a temporary variable."""
         self.variable_name_counter += 1
         if tmp:
             return self.tmp_variable(f"tmp_var_{self.variable_name_counter}", size)
