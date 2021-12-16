@@ -105,7 +105,7 @@ class BitwiseOperation(Operation, ABC):
             self.remove_operand(duplicate)
 
     def _simple_folding(self):
-        """Apply all the simple folding strategies, i.e., removing duplicates, collisions and simplifying zeros and max-constants"""
+        """Apply all the simple folding strategies, i.e., removing duplicates, collisions and simplifying zeros and max-constants."""
         pass
 
     def is_operand(self, operand: WorldObject) -> bool:
@@ -180,7 +180,7 @@ class BitwiseAnd(BitwiseOperation, CommutativeOperation, AssociativeOperation):
             self.replace_operands([Constant(self.world, 0, max([operand.size for operand in self.operands]))])
 
     def _simple_folding(self):
-        """Apply all the simple folding strategies, i.e., removing duplicates, collisions and simplifying zeros and max-constants"""
+        """Apply all the simple folding strategies, i.e., removing duplicates, collisions and simplifying zeros and max-constants."""
         self._remove_duplicated_terms()
         # eval to 0 if one operand is zero or there is a collision (e.g. a AND !a)
         if any([constant for constant in self.constants if constant.unsigned == 0]) or self._has_collision():
@@ -198,7 +198,7 @@ class BitwiseAnd(BitwiseOperation, CommutativeOperation, AssociativeOperation):
             e.g. a & (a | b) = a and (a | b) & (a | b | c) = (a | b)
             e.g. a & (!a | b) = (a & b)
         """
-        if not isinstance(term2, BitwiseOperation) or not (isinstance(term1, BitVector) or term1.variable_count() < term2.variable_count()):
+        if not isinstance(term2, BitwiseOperation) or (isinstance(term1, Operation) and term1.variable_count() > term2.variable_count()):
             return False
         if term2.replace_term_by(term1, Constant.create_maximum_value(self.world, term1.size)):
             return True
@@ -299,7 +299,7 @@ class BitwiseOr(BitwiseOperation, CommutativeOperation, AssociativeOperation):
             self.replace_operands([Constant.create_maximum_value(self.world, max([operand.size for operand in self.operands]))])
 
     def _simple_folding(self):
-        """Apply all the simple folding strategies, i.e., removing duplicates, collisions and simplifying zeros and max-constants"""
+        """Apply all the simple folding strategies, i.e., removing duplicates, collisions and simplifying zeros and max-constants."""
         self._remove_duplicated_terms()
         # evaluate to 0xffff.. if a term and its direct negation are part of the operation
         maximum = Constant.create_maximum_value(self.world, max([operand.size for operand in self.operands]))
@@ -384,7 +384,7 @@ class BitwiseOr(BitwiseOperation, CommutativeOperation, AssociativeOperation):
             (a&c) | (!(a&c) & b) = (a&c) | b
         eg. a | (a & b) = a and (a & b) | (a & b & c) = (a & b)
         """
-        if not isinstance(term2, BitwiseOperation) or not (isinstance(term1, BitVector) or term1.variable_count() < term2.variable_count()):
+        if not isinstance(term2, BitwiseOperation) or (isinstance(term1, Operation) and term1.variable_count() > term2.variable_count()):
             return False
         if term2.replace_term_by(term1, Constant(self.world, 0, term1.size)):
             return True
@@ -413,7 +413,7 @@ class BitwiseXor(BitwiseOperation, CommutativeOperation, AssociativeOperation):
 
     def _get_duplicate_classes(self) -> Iterator[Tuple[WorldObject, List[WorldObject]]]:
         """Yield all duplicate classes of the operand."""
-        operands = enumerate(self.operands)
+        operands: List[Tuple[int, WorldObject]] = [(idx, operand) for idx, operand in enumerate(self.operands)]
         sorted_operands: Set[int] = set()
         for index, term in operands:
             if index in sorted_operands:
@@ -429,6 +429,7 @@ class BitwiseXor(BitwiseOperation, CommutativeOperation, AssociativeOperation):
     def fold(self, keep_form: bool = False):
         """
         Fold all terms in the operation.
+
         e.g. x ^ 2 ^ x = 2
         e.g. x ^ y ^ 0 = x ^ y
         e.g. x ^ y ^ 1 = !(x ^ y)
@@ -437,35 +438,24 @@ class BitwiseXor(BitwiseOperation, CommutativeOperation, AssociativeOperation):
         self._simple_folding()
 
     def _simple_folding(self):
-        """Apply all the simple folding strategies, i.e., removing duplicates, simplify 0 and max-value constants"""
+        """Apply all the simple folding strategies, i.e., removing duplicates, simplify 0 and max-value constants."""
         # remove duplicates
+        operation_size = self.size
         for operand, duplicate_class in self._get_duplicate_classes():
             for op in duplicate_class:
                 self.remove_operand(op)
-            if (len(duplicate_class) + 1) % 2:
+            if (len(duplicate_class) + 1) % 2 == 0:
                 self.remove_operand(operand)
-        max_const = Constant.create_maximum_value(self.world, self.size)
+        if len(self.operands) == 0:
+            self.world.add_operand(self, Constant(self.world, 0, operation_size))
+            return
+        max_const = Constant.create_maximum_value(self.world, operation_size)
         for const_operand in (op for op in self.operands if isinstance(op, Constant)):
             if const_operand.unsigned == 0:
                 self.remove_operand(const_operand)
             if const_operand == max_const:
                 self.remove_operand(const_operand)
                 self.negate()
-
-        # removal_candidates: Dict[WorldObject, int] = {}
-        # for duplicate in self._get_duplicate_terms():
-        #
-        #     found = False
-        #     for candidate in removal_candidates.keys():
-        #         if self.world.compare(candidate, duplicate):
-        #             removal_candidates[candidate] += 1
-        #             found = True
-        #     if not found:
-        #         removal_candidates[duplicate] = 1
-        # for (duplicate, count) in removal_candidates.items():
-        #     for _ in range(count // 2):
-        #         self.remove_operand(duplicate)
-        #         self.remove_operand(duplicate)
 
     @dirty
     def factorize(self) -> None:

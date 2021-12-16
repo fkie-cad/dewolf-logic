@@ -287,9 +287,7 @@ class TestFreeConditions:
             hash(w.get_definition(var_1)) == hash(w.get_definition(var_2)) for var_1, var_2 in combinations((var_u, var_v, var_w, var_x), 2)
         )
         w.free_world_condition(var_u)
-        assert all(
-            hash(w.get_definition(var_u)) != hash(w.get_definition(var)) for var in [var_v, var_w, var_x]
-        )
+        assert all(hash(w.get_definition(var_u)) != hash(w.get_definition(var)) for var in [var_v, var_w, var_x])
         assert all(
             hash(w.get_definition(var_1)) == hash(w.get_definition(var_2)) for var_1, var_2 in combinations((var_v, var_w, var_x), 2)
         )
