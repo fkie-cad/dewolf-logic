@@ -9,6 +9,7 @@ from setuptools import find_packages, setup
 
 here = pathlib.Path(__file__).parent.resolve()
 
+
 setup(
     name="delogic",
     version="0.2",
