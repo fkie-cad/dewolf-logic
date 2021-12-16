@@ -221,6 +221,9 @@ class BitwiseAnd(BitwiseOperation, CommutativeOperation, AssociativeOperation):
             return True
 
         if isinstance(term1, BitwiseOr) and isinstance(term2, BitwiseOr):
+            operands = [op.operand if isinstance(op, BitwiseNegate) else self.world.bitwise_negate(op) for op in term1.operands]
+            if term2.replace_term_by(self.world.bitwise_and(*operands), Constant(self.world, 0, term1.size)):
+                return True
             common_operands, operands_1, operands_2 = self._get_common_and_unique_operands(term1, term2)
             if len(operands_1) == 0:
                 self.remove_operand(term2)
@@ -415,6 +418,9 @@ class BitwiseOr(BitwiseOperation, CommutativeOperation, AssociativeOperation):
             return True
 
         if isinstance(term1, BitwiseAnd) and isinstance(term2, BitwiseAnd):
+            operands = [op.operand if isinstance(op, BitwiseNegate) else self.world.bitwise_negate(op) for op in term1.operands]
+            if term2.replace_term_by(self.world.bitwise_or(*operands), Constant.create_maximum_value(self.world, term1.size)):
+                return True
             common_operands, operands_1, operands_2 = self._get_common_and_unique_operands(term1, term2)
             if len(operands_1) == 0:
                 self.remove_operand(term2)
@@ -527,7 +533,11 @@ class BitwiseNegate(UnaryOperation):
     def negate(self, level: Optional[int] = None, predecessors: Optional[List[Operation]] = None) -> WorldObject:
         """Negate the given condition."""
         negated_operand = self.operand
-        self.world.substitute(self, self.operand)
+        if predecessors is None:
+            self.world.substitute(self, self.operand)
+        else:
+            for pred in predecessors:
+                self.world.replace_operand(pred, self, negated_operand)
         return negated_operand
 
     def dissolve_negation(self) -> Optional[WorldObject]:

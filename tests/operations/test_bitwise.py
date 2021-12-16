@@ -161,6 +161,14 @@ class TestBitwiseAnd:
             w.simplify()
             assert World.compare(v, w.from_string("x@1"))
 
+        def test_associative_folding_7(self):
+            """(~x | ~y) & (z | (x & y)) = (~x | ~y) & z"""
+            w = World()
+            cond = w.from_string("(& (| (~x@1) (~y@1)) (| z@1 (& x@1 y@1)) )")
+            w.define(v := w.variable("v", 1), cond)
+            w.simplify()
+            assert World.compare(v, w.from_string("(& (| (~ x@1) (~ y@1) ) z@1)"))
+
     @pytest.mark.parametrize(
         "lhs, rhs",
         [
@@ -445,6 +453,14 @@ class TestBitwiseOr:
             w.define(v := w.variable("v", 1), cond)
             w.simplify()
             assert World.compare(v, w.from_string("x@1"))
+
+        def test_associative_folding_9(self):
+            """(~x & ~y) | (z & (x | y)) = (~x & ~y) | z"""
+            w = World()
+            cond = w.from_string("(| (& (~x@1) (~y@1)) (& z@1 (| x@1 y@1)) )")
+            w.define(v := w.variable("v", 1), cond)
+            w.simplify()
+            assert World.compare(v, w.from_string("(| (& (~ x@1) (~ y@1) ) z@1)"))
 
     class TestFactorize:
         def test_factorize(self):
