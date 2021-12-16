@@ -104,6 +104,21 @@ class BitwiseOperation(Operation, ABC):
         for duplicate in self._get_duplicate_terms():
             self.remove_operand(duplicate)
 
+    def _get_common_and_unique_operands(
+        self, term1: BitwiseOperation, term2: BitwiseOperation
+    ) -> Tuple[List[WorldObject], Set[WorldObject], Set[WorldObject]]:
+        """Return the list of common operands of the given operations as well as sets with their unique operands."""
+        operands_1 = set(term1.operands)
+        operands_2 = set(term2.operands)
+        common_operands = list()
+        for operand_1 in term1.operands:
+            for operand_2 in term2.operands:
+                if self.world.compare(operand_1, operand_2):
+                    common_operands.append(operand_1)
+                    operands_1.remove(operand_1)
+                    operands_2.remove(operand_2)
+        return common_operands, operands_1, operands_2
+
     def _simple_folding(self):
         """Apply all the simple folding strategies, i.e., removing duplicates, collisions and simplifying zeros and max-constants."""
         pass
@@ -206,12 +221,20 @@ class BitwiseAnd(BitwiseOperation, CommutativeOperation, AssociativeOperation):
             return True
 
         if isinstance(term1, BitwiseOr) and isinstance(term2, BitwiseOr):
-            for operand_1 in term1.operands:
-                if not term2.is_operand(operand_1):
-                    return False
-            # term1 is sub-term of term 2
-            self.remove_operand(term2)
-            return True
+            common_operands, operands_1, operands_2 = self._get_common_and_unique_operands(term1, term2)
+            if len(operands_1) == 0:
+                self.remove_operand(term2)
+                return True
+            op_1 = operands_1.pop() if len(operands_1) == 1 else self.world.bitwise_or(*operands_1)
+            op_2 = operands_2.pop() if len(operands_2) == 1 else self.world.bitwise_or(*operands_2)
+            if (isinstance(op_1, BitwiseNegate) and self.world.compare(op_1.operand, op_2)) or (
+                isinstance(op_2, BitwiseNegate) and self.world.compare(op_1, op_2.operand)
+            ):
+                new_operand = self.world.bitwise_or(*common_operands) if len(common_operands) > 1 else common_operands[0]
+                self.remove_operand(term1)
+                self.remove_operand(term2)
+                self.add_operand(new_operand)
+                return True
         return False
 
     @dirty
@@ -392,12 +415,21 @@ class BitwiseOr(BitwiseOperation, CommutativeOperation, AssociativeOperation):
             return True
 
         if isinstance(term1, BitwiseAnd) and isinstance(term2, BitwiseAnd):
-            for operand_1 in term1.operands:
-                if not term2.is_operand(operand_1):
-                    return False
-            # term1 is sub-term of term 2
-            self.remove_operand(term2)
-            return True
+            common_operands, operands_1, operands_2 = self._get_common_and_unique_operands(term1, term2)
+            if len(operands_1) == 0:
+                self.remove_operand(term2)
+                return True
+            op_1 = operands_1.pop() if len(operands_1) == 1 else self.world.bitwise_and(*operands_1)
+            op_2 = operands_2.pop() if len(operands_2) == 1 else self.world.bitwise_and(*operands_2)
+            if (isinstance(op_1, BitwiseNegate) and self.world.compare(op_1.operand, op_2)) or (
+                isinstance(op_2, BitwiseNegate) and self.world.compare(op_1, op_2.operand)
+            ):
+                new_operand = self.world.bitwise_and(*common_operands) if len(common_operands) > 1 else common_operands[0]
+                self.remove_operand(term1)
+                self.remove_operand(term2)
+                self.add_operand(new_operand)
+                return True
+
         return False
 
 
