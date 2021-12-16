@@ -3,14 +3,14 @@ from __future__ import annotations
 
 from abc import ABC
 from functools import reduce
-from itertools import combinations, product
+from itertools import combinations, permutations, product
 from operator import and_, lshift, neg, or_, rshift, xor
 from typing import TYPE_CHECKING, Dict, Iterator, List, Optional, Set, Tuple, Type, Union
 
 from simplifier.common import T
 from simplifier.operations.interface import AssociativeOperation, CommutativeOperation, OrderedOperation, UnaryOperation
 from simplifier.util.decorators import dirty
-from simplifier.world.nodes import Constant, Operation, Variable, WorldObject
+from simplifier.world.nodes import BitVector, Constant, Operation, Variable, WorldObject
 
 if TYPE_CHECKING:
     from simplifier.visitor import WorldObjectVisitor
@@ -99,6 +99,48 @@ class BitwiseOperation(Operation, ABC):
         self.world.replace(self, new_op)
         return new_op
 
+    def _remove_duplicated_terms(self):
+        """Remove all duplicated terms in the operands."""
+        for duplicate in self._get_duplicate_terms():
+            self.remove_operand(duplicate)
+
+    def _simple_folding(self):
+        """Apply all the simple folding strategies, i.e., removing duplicates, collisions and simplifying zeros and max-constants"""
+        pass
+
+    def is_operand(self, operand: WorldObject) -> bool:
+        """Check whether the given operand is an operand of the operation."""
+        for op in self.operands:
+            if self.world.compare(operand, op):
+                return True
+        return False
+
+    def replace_term_by(self, replacement_term, value: Constant) -> bool:
+        """Return whether we replaced the given term by the given value somewhere in the formula."""
+        changes = False
+        for operand in self.operands:
+            if self.world.compare(operand, replacement_term):
+                self.world.replace_operand(self, operand, value)
+                self._simple_folding()
+                changes = True
+                break
+        for operand in self.operands:
+            if isinstance(operand, BitwiseOperation):
+                changes = operand.replace_term_by(replacement_term, value) | changes
+            elif isinstance(operand, BitwiseNegate):
+                neg_operand = operand.operand
+                if self.world.compare(neg_operand, replacement_term):
+                    self.world.replace_operand(self, operand, operand.eval([value]))
+                    changes = True
+                elif isinstance(neg_operand, BitwiseOperation):
+                    changes = neg_operand.replace_term_by(replacement_term, value) | changes
+
+        self._simple_folding()
+        if len(self.operands) == 1 and isinstance(self, (CommutativeOperation, AssociativeOperation)):
+            self._promote_single_operand()
+            return True
+        return changes
+
 
 class BitwiseAnd(BitwiseOperation, CommutativeOperation, AssociativeOperation):
     """Class representing a bitwise and operation."""
@@ -120,9 +162,26 @@ class BitwiseAnd(BitwiseOperation, CommutativeOperation, AssociativeOperation):
         a & 0 = 0
         a@8 & 11111111 = a
         """
-        # remove duplicate terms from the operation
-        for duplicate in self._get_duplicate_terms():
-            self.remove_operand(duplicate)
+        self._simple_folding()
+
+        # perform associative folding here.
+        has_folded = True
+        while has_folded:
+            self._promote_subexpression()
+            has_folded = False
+            for operand1, operand2 in permutations(self.operands, 2):
+                if self._associative_fold(operand1, operand2):
+                    has_folded = True
+                    self._simple_folding()
+                    break
+
+        self._promote_subexpression()
+        if self._has_collision():
+            self.replace_operands([Constant(self.world, 0, max([operand.size for operand in self.operands]))])
+
+    def _simple_folding(self):
+        """Apply all the simple folding strategies, i.e., removing duplicates, collisions and simplifying zeros and max-constants"""
+        self._remove_duplicated_terms()
         # eval to 0 if one operand is zero or there is a collision (e.g. a AND !a)
         if any([constant for constant in self.constants if constant.unsigned == 0]) or self._has_collision():
             self.replace_operands([Constant(self.world, 0, max([operand.size for operand in self.operands]))])
@@ -131,80 +190,28 @@ class BitwiseAnd(BitwiseOperation, CommutativeOperation, AssociativeOperation):
             if constant.unsigned == constant.maximum and len(self.operands) > 1:
                 self.remove_operand(constant)
 
-        # perform associative folding here.
-        while True:
-            self._promote_subexpression()
-            changes = False
-            for operand1, operand2 in combinations(self.operands, 2):
-                if (
-                    self._variable_fold(operand1, operand2)
-                    or self._variable_fold(operand2, operand1)
-                    or self._associative_fold(operand1, operand2)
-                    or self._associative_fold(operand2, operand1)
-                ):
-                    changes = True
-                    break
-            if changes is False:
-                break
-        self._promote_subexpression()
-        for duplicate in self._get_duplicate_terms():
-            self.remove_operand(duplicate)
-        if self._has_collision():
-            self.replace_operands([Constant(self.world, 0, max([operand.size for operand in self.operands]))])
-
-    def _variable_fold(self, term1, term2):
+    def _associative_fold(self, term1: WorldObject, term2: WorldObject):
         """
-        Fold a variable.
+        Associative folding.
 
-        eg. a & (a | b) = a and (a | b) & (a | b | c) = (a | b)
+        If one operand is also contained in the other operand, replace it by all 1s because it must be all 1s to fulfill the formula.
+            e.g. a & (a | b) = a and (a | b) & (a | b | c) = (a | b)
+            e.g. a & (!a | b) = (a & b)
         """
-        if not isinstance(term1, (BitwiseOr, BitwiseXor)):
+        if not isinstance(term2, BitwiseOperation) or not (isinstance(term1, BitVector) or term1.variable_count() < term2.variable_count()):
             return False
-        for operand in term1.operands:
-            if self.world.compare(operand, term2):
-                if isinstance(term1, BitwiseOr):
-                    self.remove_operand(term1)
-                else:  # BitwiseXor
-                    term1.remove_operand(operand)
-                    term1.negate(predecessors=[self])
-                    term1._promote_single_operand()
-                return True
-            # I would like to remove this part after we simplify as long as nothing changes!
-            if isinstance(operand, BitwiseAnd) and any(self.world.compare(term2, op) for op in operand.operands):
-                for op in operand.operands:
-                    if self.world.compare(term2, op):
-                        operand.remove_operand(op)
-                        operand._promote_single_operand()
-                        return True
+        if term2.replace_term_by(term1, Constant.create_maximum_value(self.world, term1.size)):
+            return True
+        if isinstance(term1, BitwiseNegate) and term2.replace_term_by(term1.operand, Constant(self.world, 0, term1.size)):
+            return True
 
         if isinstance(term1, BitwiseOr) and isinstance(term2, BitwiseOr):
-            for operand_2 in term2.operands:
-                for operand_1 in term1.operands:
-                    if self.world.compare(operand_1, operand_2):
-                        break
-                else:
-                    break
-            else:
-                self.remove_operand(term1)
-                return True
-        return False
-
-    def _associative_fold(self, term1: WorldObject, term2: WorldObject) -> bool:
-        """Apply associative folding.
-
-        Eg. a & (!a | b) = (a & b)
-        """
-        if not isinstance(term1, (BitwiseOr, BitwiseXor)) or (
-            isinstance(term2, Operation) and term1.variable_count() < term2.variable_count()
-        ):
-            return False
-        negated_term_2 = term2.operand if isinstance(term2, BitwiseNegate) else self.world.bitwise_negate(term2)
-        for operand in term1.operands:
-            if self.world.compare(operand, negated_term_2):
-                term1.remove_operand(operand)
-                term1._promote_single_operand()
-                return True
-
+            for operand_1 in term1.operands:
+                if not term2.is_operand(operand_1):
+                    return False
+            # term1 is sub-term of term 2
+            self.remove_operand(term2)
+            return True
         return False
 
     @dirty
@@ -274,9 +281,26 @@ class BitwiseOr(BitwiseOperation, CommutativeOperation, AssociativeOperation):
         e.g. a | 0 = a
         e.g. a | 0xffff... = 0xffff...
         """
-        # remove duplicate terms from the operation
-        for duplicate in self._get_duplicate_terms():
-            self.remove_operand(duplicate)
+        self._simple_folding()
+
+        # associative & variable folding: may change the form of this operation
+        has_folded = True
+        while has_folded:
+            self._promote_subexpression()
+            has_folded = False
+            for operand1, operand2 in permutations(self.operands, 2):
+                if self._associative_fold(operand1, operand2):
+                    has_folded = True
+                    self._simple_folding()
+                    break
+
+        self._promote_subexpression()
+        if self._has_collision():
+            self.replace_operands([Constant.create_maximum_value(self.world, max([operand.size for operand in self.operands]))])
+
+    def _simple_folding(self):
+        """Apply all the simple folding strategies, i.e., removing duplicates, collisions and simplifying zeros and max-constants"""
+        self._remove_duplicated_terms()
         # evaluate to 0xffff.. if a term and its direct negation are part of the operation
         maximum = Constant.create_maximum_value(self.world, max([operand.size for operand in self.operands]))
         if self._has_collision() or maximum in self.constants:
@@ -285,25 +309,6 @@ class BitwiseOr(BitwiseOperation, CommutativeOperation, AssociativeOperation):
             # remove any zero constant, unless its the last operand
             if constant.unsigned == 0 and len(self.operands) > 1:
                 self.remove_operand(constant)
-        if keep_form:
-            return
-        # associative & variable folding: may change the form of this operation
-        while True:
-            self._promote_subexpression()
-            changes = False
-            for operand1, operand2 in combinations(self.operands, 2):
-                if (
-                    self._variable_fold(operand1, operand2)
-                    or self._variable_fold(operand2, operand1)
-                    or self._associative_fold(operand1, operand2)
-                    or self._associative_fold(operand2, operand1)
-                ):
-                    changes = True
-                    break
-            if changes is False:
-                break
-        if self._has_collision():
-            self.replace_operands([maximum])
 
     @dirty
     def factorize(self) -> Optional[BitwiseAnd]:
@@ -377,85 +382,22 @@ class BitwiseOr(BitwiseOperation, CommutativeOperation, AssociativeOperation):
             (!a & b) | a = a | b
             !a | (a & b) = !a | b
             (a&c) | (!(a&c) & b) = (a&c) | b
-        """
-        if not isinstance(term1, (BitwiseAnd, BitwiseXor)) or (
-            isinstance(term2, Operation) and term1.variable_count() < term2.variable_count()
-        ):
-            return False
-        negated_term_2 = term2.operand if isinstance(term2, BitwiseNegate) else self.world.bitwise_negate(term2)
-        negated_term_2_resolved = negated_term_2.copy_tree().dissolve_negation() if isinstance(negated_term_2, BitwiseNegate) else None  # type: ignore
-        for operand in term1.operands:
-            if self.world.compare(operand, negated_term_2) or self.world.compare(operand, negated_term_2_resolved):
-                if isinstance(term1, BitwiseAnd):
-                    term1.remove_operand(operand)
-                    term1._promote_single_operand()
-                else:  # BitwiseXor
-                    term1.remove_operand(operand)
-                    term1.negate(predecessors=[self])
-                    term1._promote_single_operand()
-                return True
-
-        if isinstance(term1, BitwiseAnd) and isinstance(term2, BitwiseAnd):
-            unique_operands_term_1 = []
-            common_terms = set()
-            for operand_1 in term1.operands:
-                for operand_2 in term2.operands:
-                    if self.world.compare(operand_1, operand_2):
-                        common_terms.add(operand_2)
-                        break
-                else:
-                    unique_operands_term_1.append(operand_1)
-            if common_terms:
-                unique_operands_term_2 = [op for op in term2.operands if op not in common_terms]
-                unique_term_2 = (
-                    self.world.bitwise_and(unique_operands_term_2) if len(unique_operands_term_2) > 1 else unique_operands_term_2[0]
-                )
-                unique_term_1 = (
-                    self.world.bitwise_and(unique_operands_term_1) if len(unique_operands_term_1) > 1 else unique_operands_term_1[0]
-                )
-                negated_term_2 = (
-                    unique_term_2.operand if isinstance(unique_term_2, BitwiseNegate) else self.world.bitwise_negate(unique_term_2)
-                )
-                negated_term_2_resolved = (
-                    negated_term_2.copy_tree().dissolve_negation() if isinstance(negated_term_2, BitwiseNegate) else None  # type: ignore
-                )
-                if self.world.compare(unique_term_1, negated_term_2) or self.world.compare(unique_term_1, negated_term_2_resolved):
-                    self.world.remove_operand(self, term1)
-                    self.world.remove_operand(self, term2)
-                    new_operand = self.world.bitwise_and(common_terms) if len(common_terms) > 1 else common_terms.pop()
-                    self.world.add_operand(self, new_operand)
-                    return True
-
-        return False
-
-    def _variable_fold(self, term1: WorldObject, term2: WorldObject) -> bool:
-        """
-        Fold a variable.
-
         eg. a | (a & b) = a and (a & b) | (a & b & c) = (a & b)
         """
-        if not isinstance(term1, (BitwiseAnd, BitwiseXor)):
+        if not isinstance(term2, BitwiseOperation) or not (isinstance(term1, BitVector) or term1.variable_count() < term2.variable_count()):
             return False
-        for operand in term1.operands:
-            if self.world.compare(operand, term2):
-                if isinstance(term1, BitwiseAnd):
-                    self.remove_operand(term1)
-                else:  # BitwiseXor
-                    term1.remove_operand(operand)
-                    term1._promote_single_operand()
-                return True
+        if term2.replace_term_by(term1, Constant(self.world, 0, term1.size)):
+            return True
+        if isinstance(term1, BitwiseNegate) and term2.replace_term_by(term1.operand, Constant.create_maximum_value(self.world, term1.size)):
+            return True
 
         if isinstance(term1, BitwiseAnd) and isinstance(term2, BitwiseAnd):
-            for operand_2 in term2.operands:
-                for operand_1 in term1.operands:
-                    if self.world.compare(operand_1, operand_2):
-                        break
-                else:
-                    break
-            else:
-                self.remove_operand(term1)
-                return True
-
+            for operand_1 in term1.operands:
+                if not term2.is_operand(operand_1):
+                    return False
+            # term1 is sub-term of term 2
+            self.remove_operand(term2)
+            return True
         return False
 
 
@@ -469,26 +411,61 @@ class BitwiseXor(BitwiseOperation, CommutativeOperation, AssociativeOperation):
         new_value = reduce(xor, [constant.unsigned for constant in operands])
         return Constant(self.world, new_value, max([constant.size for constant in operands]))
 
+    def _get_duplicate_classes(self) -> Iterator[Tuple[WorldObject, List[WorldObject]]]:
+        """Yield all duplicate classes of the operand."""
+        operands = enumerate(self.operands)
+        sorted_operands: Set[int] = set()
+        for index, term in operands:
+            if index in sorted_operands:
+                continue
+            duplicate_class = []
+            for idx, op in operands[index + 1 :]:
+                if idx not in sorted_operands and self.world.compare(op, term):
+                    sorted_operands.add(idx)
+                    duplicate_class.append(op)
+            yield term, duplicate_class
+
     @dirty
     def fold(self, keep_form: bool = False):
         """
         Fold all terms in the operation.
-
         e.g. x ^ 2 ^ x = 2
+        e.g. x ^ y ^ 0 = x ^ y
+        e.g. x ^ y ^ 1 = !(x ^ y)
+        e.g. 1 ^ 1 = 0, 0 ^ 0 = 0, 0 ^ 1 = 1
         """
-        removal_candidates: Dict[WorldObject, int] = {}
-        for duplicate in self._get_duplicate_terms():
-            found = False
-            for candidate in removal_candidates.keys():
-                if self.world.compare(candidate, duplicate):
-                    removal_candidates[candidate] += 1
-                    found = True
-            if not found:
-                removal_candidates[duplicate] = 1
-        for (duplicate, count) in removal_candidates.items():
-            for _ in range(count // 2):
-                self.remove_operand(duplicate)
-                self.remove_operand(duplicate)
+        self._simple_folding()
+
+    def _simple_folding(self):
+        """Apply all the simple folding strategies, i.e., removing duplicates, simplify 0 and max-value constants"""
+        # remove duplicates
+        for operand, duplicate_class in self._get_duplicate_classes():
+            for op in duplicate_class:
+                self.remove_operand(op)
+            if (len(duplicate_class) + 1) % 2:
+                self.remove_operand(operand)
+        max_const = Constant.create_maximum_value(self.world, self.size)
+        for const_operand in (op for op in self.operands if isinstance(op, Constant)):
+            if const_operand.unsigned == 0:
+                self.remove_operand(const_operand)
+            if const_operand == max_const:
+                self.remove_operand(const_operand)
+                self.negate()
+
+        # removal_candidates: Dict[WorldObject, int] = {}
+        # for duplicate in self._get_duplicate_terms():
+        #
+        #     found = False
+        #     for candidate in removal_candidates.keys():
+        #         if self.world.compare(candidate, duplicate):
+        #             removal_candidates[candidate] += 1
+        #             found = True
+        #     if not found:
+        #         removal_candidates[duplicate] = 1
+        # for (duplicate, count) in removal_candidates.items():
+        #     for _ in range(count // 2):
+        #         self.remove_operand(duplicate)
+        #         self.remove_operand(duplicate)
 
     @dirty
     def factorize(self) -> None:

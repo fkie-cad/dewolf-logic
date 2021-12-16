@@ -1,6 +1,0 @@
-pyproject.toml
-setup.py
-logic.egg-info/PKG-INFO
-logic.egg-info/SOURCES.txt
-logic.egg-info/dependency_links.txt
-logic.egg-info/top_level.txt

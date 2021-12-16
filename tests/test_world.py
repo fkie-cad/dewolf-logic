@@ -260,9 +260,9 @@ class TestFreeConditions:
     def test_nothing_for_literals(self, condition):
         w = World()
         cond = w.from_string(condition)
-        w.define(w.variable("u", 8), cond)
+        u = w.define(w.variable("u", 8), cond)
         w.define(w.variable("v", 8), cond)
-        w.free_world_conditions()
+        w.free_world_condition(u)
         assert len(w) == 3
 
     @pytest.mark.parametrize("condition", ["(& z@3 2@3)", "(| (& z@3 2@3 y@3) 5@3 a@3)"])
@@ -272,7 +272,7 @@ class TestFreeConditions:
         w.define(var_u := w.variable("u", 8), cond)
         w.define(var_v := w.variable("v", 8), cond)
         assert hash(w.get_definition(var_u)) == hash(w.get_definition(var_v))
-        w.free_world_conditions()
+        w.free_world_condition(var_v)
         assert hash(w.get_definition(var_u)) != hash(w.get_definition(var_v))
 
     @pytest.mark.parametrize("condition", ["(& z@3 2@3)", "(| (& z@3 2@3 y@3) 5@3 a@3)"])
@@ -286,7 +286,16 @@ class TestFreeConditions:
         assert all(
             hash(w.get_definition(var_1)) == hash(w.get_definition(var_2)) for var_1, var_2 in combinations((var_u, var_v, var_w, var_x), 2)
         )
-        w.free_world_conditions()
+        w.free_world_condition(var_u)
+        assert all(
+            hash(w.get_definition(var_u)) != hash(w.get_definition(var)) for var in [var_v, var_w, var_x]
+        )
+        assert all(
+            hash(w.get_definition(var_1)) == hash(w.get_definition(var_2)) for var_1, var_2 in combinations((var_v, var_w, var_x), 2)
+        )
+        w.free_world_condition(var_v)
+        w.free_world_condition(var_w)
+        w.free_world_condition(var_x)
         assert all(
             hash(w.get_definition(var_1)) != hash(w.get_definition(var_2)) for var_1, var_2 in combinations((var_u, var_v, var_w, var_x), 2)
         )
@@ -302,7 +311,16 @@ class TestFreeConditions:
         w.define(var := w.variable("v", 8), or_cond)
         assert w._graph.in_degree(or_cond) == 2 and w._graph.in_degree(cond1) == 2 and w._graph.in_degree(cond2) == 3
         numb_nodes = len(w)
-        w.free_world_conditions()
+
+        w.free_world_condition(cond2)
+        assert len(w) == numb_nodes
+
+        w.free_world_condition(or_cond)
+        assert len(w) == numb_nodes + 1 and hash(or_cond.operands[1]) != hash(cond1)
+
+        w.free_world_condition(and_cond)
+        w.free_world_condition(neg_cond)
+        w.free_world_condition(and_con2)
         assert len(w) == numb_nodes + 7
         assert all(w._graph.in_degree(node) <= 1 for node in w.iter_postorder() if isinstance(node, Operation))
         assert hash(w.get_definition(var)) != hash(and_con2.operands[1]) and str(w.get_definition(var)) == str(and_con2.operands[1])

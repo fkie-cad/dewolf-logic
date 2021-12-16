@@ -54,7 +54,7 @@ class WorldInterface:
         while in_degree_larger_one_operations:
             operation = in_degree_larger_one_operations.pop()
             operand_edges = self._graph.get_out_edges(operation)
-            relations = {relation for relation in self._graph.get_in_edges(operation)[1:] if relation.source in condition_nodes}
+            relations = {relation for relation in self._graph.get_in_edges(operation) if relation.source in condition_nodes}
             condition_nodes.remove(operation)
             for in_relation in relations:
                 copy_node = operation.copy()
@@ -65,25 +65,25 @@ class WorldInterface:
                         in_degree_larger_one_operations.add(relation.sink)
                 self._graph.substitute_edge(in_relation, in_relation.copy(sink=copy_node))
 
-    def free_world_conditions(self):
-        """
-        Copy operations such that each node has only in-degree 1.
-
-        If a condition is given, do it only for this condition, otherwise for the hole world.
-        """
-        in_degree_larger_one_operations = {
-            node for node in self.iter_postorder() if isinstance(node, Operation) and self._graph.in_degree(node) > 1
-        }
-        while in_degree_larger_one_operations:
-            operation = in_degree_larger_one_operations.pop()
-            operand_edges = self._graph.get_out_edges(operation)
-            for in_relation in self._graph.get_in_edges(operation)[1:]:
-                copy_node = operation.copy()
-                for relation in operand_edges:
-                    self._graph.add_edge(relation.copy(source=copy_node))
-                    if self._graph.in_degree(relation.sink) > 1:
-                        in_degree_larger_one_operations.add(relation.sink)
-                self._graph.substitute_edge(in_relation, in_relation.copy(sink=copy_node))
+    # def free_world_conditions(self):
+    #     """
+    #     Copy operations such that each node has only in-degree 1.
+    #
+    #     If a condition is given, do it only for this condition, otherwise for the hole world.
+    #     """
+    #     in_degree_larger_one_operations = {
+    #         node for node in self.iter_postorder() if isinstance(node, Operation) and self._graph.in_degree(node) > 1
+    #     }
+    #     while in_degree_larger_one_operations:
+    #         operation = in_degree_larger_one_operations.pop()
+    #         operand_edges = self._graph.get_out_edges(operation)
+    #         for in_relation in self._graph.get_in_edges(operation)[1:]:
+    #             copy_node = operation.copy()
+    #             for relation in operand_edges:
+    #                 self._graph.add_edge(relation.copy(source=copy_node))
+    #                 if self._graph.in_degree(relation.sink) > 1:
+    #                     in_degree_larger_one_operations.add(relation.sink)
+    #             self._graph.substitute_edge(in_relation, in_relation.copy(sink=copy_node))
 
     def __len__(self) -> int:
         """Return the number of WorldObjects."""
@@ -155,6 +155,14 @@ class WorldInterface:
             self._graph.remove_edge(edges[0])
             return True
         return False
+
+    def replace_operand(self, operation: Operation, replacee_operand: WorldObject, replacement_operand: WorldObject):
+        edges = self._graph.get_edges(operation, replacee_operand)
+        for edge in edges:
+            self._graph.remove_edge(edge)
+            self._graph.add_node(node := replacement_operand.copy())
+            self._graph.add_edge(edge.copy(sink=node))
+
 
     def add_operation_on_edge(self, edge: WorldRelation, operation: Operation):
         """Add the given operation on the given edge, by splitting it."""
