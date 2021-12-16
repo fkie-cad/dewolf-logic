@@ -206,6 +206,7 @@ class TreeInWorld(Transformer):
     def __init__(self, world: World, *args, **kwargs):
         """Initialise this transformer with a World."""
         self._world = world
+        self.variable_name_counter = 0
         super().__init__(*args, **kwargs)
 
     @v_args(inline=True)
@@ -255,6 +256,11 @@ class TreeInWorld(Transformer):
         """Parse a temporary Variable."""
         var = var[5:]
         return self._world.tmp_variable(var, sz)
+
+    @v_args(inline=True)
+    def new_variable(self, size: int, tmp: bool = False) -> BaseVariable:
+        """Parse a new Variable creation."""
+        return self._world.new_variable(size, tmp)
 
     @v_args(inline=True)
     def define(self, variable: Variable, rhs: WorldObject[World]) -> WorldObject:
