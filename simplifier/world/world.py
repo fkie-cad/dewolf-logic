@@ -258,11 +258,6 @@ class TreeInWorld(Transformer):
         return self._world.tmp_variable(var, sz)
 
     @v_args(inline=True)
-    def new_variable(self, size: int, tmp: bool = False) -> BaseVariable:
-        """Parse a new Variable creation."""
-        return self._world.new_variable(size, tmp)
-
-    @v_args(inline=True)
     def define(self, variable: Variable, rhs: WorldObject[World]) -> WorldObject:
         """Parse a definition statement."""
         return self._world.define(variable, rhs)

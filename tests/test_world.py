@@ -134,6 +134,15 @@ class TestWorld:
         assert v is not None
         assert World.compare(v, w.from_string("(& x y)"))
 
+    def test_define_new_variable(self):
+        w = World()
+        v_1 = w.new_variable(8)
+        assert v_1 == Variable(w, "var_1", 8) and len(w) == 1 and v_1 in w._graph
+        t_v_2 = w.new_variable(8, tmp=True)
+        assert t_v_2 == TmpVariable(w, "tmp_var_2", 8) and len(w) == 2 and t_v_2 in w._graph
+        v_3 = w.new_variable(8)
+        assert v_3 == Variable(w, "var_3", 8) and len(w) == 3 and v_3 in w._graph
+
 
 class TestCleanUp:
     @pytest.mark.parametrize("term", ["v@4 = (& (| x@4 a@4) (| x@4 b@4))", "v@4 = (>> x@8 y@8)", "v@4", "v@4 = (~1@3)"])

@@ -490,12 +490,22 @@ class TestBitwiseOr:
 
 
 class TestBitwiseXor:
-    def test_duplicate_folding(self):
-        """x ^ x ^ x = x"""
+    @pytest.mark.parametrize(
+        "term, result",
+        [
+            ("(^ x@8 x@8 x@8)", "x@8"),
+            ("(^ x@8 x@8 z@8)", "z@8"),
+            ("(^ x@8 x@8)", "0@8"),
+            ("(^ x@8 0@8)", "x@8"),
+            ("(^ x@8 255@8)", "(~ x@8)"),
+        ],
+    )
+    def test_simplify(self, term, result):
+        """Simplifications for xor."""
         w = World()
-        w.define(w.variable("v", 8), w.bitwise_xor(w.variable("x", 8), w.variable("x", 8), w.variable("x", 8)))
+        w.define(v := w.variable("v", 8), w.from_string(term))
         w.simplify()
-        assert World.compare(w.get_definition(w.variable("v", 8)), w.variable("x", 8))
+        assert World.compare(v, w.from_string(result))
 
     @pytest.mark.parametrize(
         "a, b",
