@@ -1,0 +1,101 @@
+?start : expr | define
+?expr : constant
+      | basevariable
+      | operation_1
+      | operation_2
+?expr_int : constant_int
+      | basevariable
+      | operation_1
+      | operation_2
+define : basevariable _EQ expr
+constant : value _SIZE_SEP size
+constant_int: value_int _SIZE_SEP size
+variable : ident (_SIZE_SEP size)?
+tmp_variable : tmp_ident (_SIZE_SEP size)?
+?operation_1: _BKT_OPEN bitwise_neg _BKT_CLOSE
+?operation_2: _BKT_OPEN ( bitwise_op | arithmetic_op | bool_op ) _BKT_CLOSE
+?basevariable: (variable | tmp_variable)
+
+?arithmetic_op: unsigned_add | signed_add | unsigned_sub | signed_sub | unsigned_mul | signed_mul | unsigned_div | signed_div | unsigned_mod | signed_mod
+unsigned_add: _UNSIGNED_ADD _operands_many
+_UNSIGNED_ADD: "u+"
+signed_add: _SIGNED_ADD _operands_many
+_SIGNED_ADD: "s+"
+unsigned_sub: _UNSIGNED_SUB _operands_many
+_UNSIGNED_SUB: "u-"
+signed_sub: _SIGNED_SUB _operands_many
+_SIGNED_SUB: "s-"
+unsigned_mul: _UNSIGNED_MUL _operands_many
+_UNSIGNED_MUL: "u*"
+signed_mul: _SIGNED_MUL _operands_many
+_SIGNED_MUL: "s*"
+unsigned_div: _UNSIGNED_DIV _operands_many
+_UNSIGNED_DIV: "u/"
+signed_div: _SIGNED_DIV _operands_many
+_SIGNED_DIV: "s/"
+unsigned_mod: _UNSIGNED_MOD _operands_many_int
+_UNSIGNED_MOD: "u%"
+signed_mod: _SIGNED_MOD _operands_many_int
+_SIGNED_MOD: "s%"
+
+?bitwise_op: bitwise_and | bitwise_or | bitwise_xor | shift_left | shift_right | rotate_left | rotate_right
+bitwise_neg: _BITWISE_NEG _operands_1
+_BITWISE_NEG: "~"
+bitwise_and: _BITWISE_AND _operands_many
+_BITWISE_AND: "&"
+bitwise_or: _BITWISE_OR _operands_many
+_BITWISE_OR: "|"
+bitwise_xor: _BITWISE_XOR _operands_many
+_BITWISE_XOR: "^"
+shift_left: _SHIFT_LEFT _operands_many_int
+_SHIFT_LEFT: "<<"
+shift_right: _SHIFT_RIGHT _operands_many_int
+_SHIFT_RIGHT: ">>"
+rotate_left: _ROTATE_LEFT _operands_many_int
+_ROTATE_LEFT: "rotl"
+rotate_right: _ROTATE_RIGHT _operands_many_int
+_ROTATE_RIGHT: "rotr"
+
+?bool_op: bool_negate | bool_equal | bool_unequal | signed_gt | signed_ge | signed_lt | signed_le | unsigned_gt | unsigned_ge | unsigned_lt | unsigned_le
+bool_negate: _BOOL_NEG _operands_1
+_BOOL_NEG: "!"
+bool_equal: _BOOL_EQ _operands_many
+_BOOL_EQ: "=="
+bool_unequal: _BOOL_UEQ _operands_many
+_BOOL_UEQ: "!="
+signed_gt: _BOOL_SGT _operands_many
+_BOOL_SGT: "s>"
+signed_ge: _BOOL_SGE _operands_many
+_BOOL_SGE: "s>="
+signed_lt: _BOOL_SLT _operands_many
+_BOOL_SLT: "s<"
+signed_le: _BOOL_SLE _operands_many
+_BOOL_SLE: "s<="
+unsigned_gt: _BOOL_UGT _operands_many
+_BOOL_UGT: "u>"
+unsigned_ge: _BOOL_UGE _operands_many
+_BOOL_UGE: "u>="
+unsigned_lt: _BOOL_ULT _operands_many
+_BOOL_ULT: "u<"
+unsigned_le: _BOOL_ULE _operands_many
+_BOOL_ULE: "u<="
+
+_operands_1: expr
+_operands_2: expr expr
+_operands_2_int: expr_int expr_int
+_operands_many: _operands_2 | expr _operands_many
+_operands_many_int: _operands_2_int | expr_int _operands_many_int
+
+value: SIGNED_INT | SIGNED_FLOAT
+value_int: SIGNED_INT
+ident: CNAME
+tmp_ident: "(Tmp)"CNAME
+size: SIZE
+SIZE: /[1-9][0-9]*/
+_SIZE_SEP: "@"
+_BKT_OPEN: "("
+_BKT_CLOSE: ")"
+_EQ: "="
+
+%import common (CNAME, SIGNED_INT, SIGNED_FLOAT, WS)
+%ignore WS

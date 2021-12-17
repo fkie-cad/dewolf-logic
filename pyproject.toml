@@ -1,0 +1,17 @@
+[tool.black]
+line-length = 140
+target-version = ["py38"]
+
+[tool.pytest.ini_options]
+python_files = "test_*.py"
+testpaths = ["tests"]
+
+[mypy]
+python_version = 3.8
+
+[mypy.simplifier]
+
+[tool.isort]
+profile = "black"
+src_paths = ["simplifier", "tests"]
+line_length = 140

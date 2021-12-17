@@ -1,0 +1,8 @@
+networkx
+black
+mypy
+pydocstyle
+isort
+coverage
+lark~=0.11.1
+pytest>=6.0.0
