@@ -107,7 +107,7 @@ class BitwiseOperation(Operation, ABC):
     def _get_common_and_unique_operands(
         self, term1: BitwiseOperation, term2: BitwiseOperation
     ) -> Tuple[List[WorldObject], Set[WorldObject], Set[WorldObject]]:
-        """Return the list of common operands of the given operations as well as sets with their unique operands."""
+        """Return the list of common operands of the given operations as well as sets with their respective unique operands."""
         operands_1 = set(term1.operands)
         operands_2 = set(term2.operands)
         common_operands = list()

@@ -42,7 +42,7 @@ class WorldInterface:
         """
         Copy operations such that each node of the condition has only in-degree 1.
 
-        If a condition is given, do it only for this condition, otherwise for the hole world.
+        If a condition is given, do it only for this condition, otherwise for the whole world.
         """
         in_degree_larger_one_operations = set()
         condition_nodes = set()
