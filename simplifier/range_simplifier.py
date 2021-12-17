@@ -495,7 +495,7 @@ class BitwiseOrRangeSimplifier:
 
     def _simplify_and_operation(self, new_and_operation: BitwiseAnd) -> WorldObject:
         """Simplify the given And-operation using the range-simplifier for and-operations."""
-        self._world.define(defining_var := TmpVariable(self._world, f"tmp_var_{hash(new_and_operation)}", 1), new_and_operation)
+        self._world.define(defining_var := self._world.new_variable(1, tmp=True), new_and_operation)
         BitwiseAndRangeSimplifier(new_and_operation).simplify()
         simplified_formula = self._world.get_definition(defining_var)
         return simplified_formula
@@ -523,7 +523,7 @@ class RangeSimplifier:
     def __init__(self, operation: WorldObject):
         """Initialize a new object of the range simplifier to simplify the given world-object."""
         self._world: World = operation.world
-        self._defining_variable: TmpVariable = self._world.tmp_variable(f"tmp_var_{hash(operation)}", 1)
+        self._defining_variable: TmpVariable = self._world.new_variable(1, tmp=True) # type: ignore
         self._world.define(self._defining_variable, operation)
 
     @classmethod
