@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Generic, List, Optional, TypeVar, Union
+from typing import Iterable, TYPE_CHECKING, Generic, List, Optional, TypeVar, Union
 
 from simplifier.common import T
 from simplifier.util.decorators import clean, dirty
@@ -285,12 +285,13 @@ class Operation(WorldObject, ABC):
         self.world.replace(original, new)
 
     @dirty
-    def replace_operands(self, operands: List[WorldObject]):
+    def replace_operands(self, operands: Iterable[WorldObject]) -> Operation:
         """Replace all current operands with the list of new operands."""
         for operand in self.operands:
             self.remove_operand(operand)
         for operand in operands:
             self.add_operand(operand)
+        return self
 
     def copy(self) -> Operation:
         """Generate a copy of the current Operation."""
