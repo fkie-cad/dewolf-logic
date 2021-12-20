@@ -523,7 +523,7 @@ class RangeSimplifier:
     def __init__(self, operation: WorldObject):
         """Initialize a new object of the range simplifier to simplify the given world-object."""
         self._world: World = operation.world
-        self._defining_variable: TmpVariable = self._world.new_variable(1, tmp=True) # type: ignore
+        self._defining_variable: TmpVariable = self._world.new_variable(1, tmp=True)  # type: ignore
         self._world.define(self._defining_variable, operation)
 
     @classmethod

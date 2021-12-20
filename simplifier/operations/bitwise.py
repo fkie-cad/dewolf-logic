@@ -137,6 +137,7 @@ class BitwiseOperation(Operation, ABC):
     def _replace_recursively_in_operands_by_term(self, replacement_term: WorldObject, value: Constant) -> bool:
         """
         Replace in each operand every sub-operand that is equivalent to the replacement term by the given value.
+
         Return True if any operand is replaced.
         """
         changes = False

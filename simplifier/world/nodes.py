@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Iterable, TYPE_CHECKING, Generic, List, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, Generic, Iterable, List, Optional, TypeVar, Union
 
 from simplifier.common import T
 from simplifier.util.decorators import clean, dirty
