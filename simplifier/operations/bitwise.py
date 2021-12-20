@@ -96,14 +96,14 @@ class BitwiseOperation(Operation, ABC):
 
     def _get_common_and_unique_operands(
         self, term1: BitwiseOperation, term2: BitwiseOperation
-    ) -> Tuple[List[WorldObject], Set[WorldObject], Set[WorldObject]]:
+    ) -> Tuple[Set[WorldObject], Set[WorldObject], Set[WorldObject]]:
         """Return the list of common operands of the given operations as well as sets with their respective unique operands."""
         operands_1 = set(term1.operands)
         operands_2 = set(term2.operands)
-        common_operands = list()
+        common_operands = set()
         for operand_1, operand_2 in product(term1.operands, term2.operands):
             if self.world.compare(operand_1, operand_2):
-                common_operands.append(operand_1)
+                common_operands.add(operand_1)
                 operands_1.remove(operand_1)
                 operands_2.remove(operand_2)
         return common_operands, operands_1, operands_2
@@ -205,44 +205,63 @@ class CommonBitwiseAndOr(BitwiseOperation, CommutativeOperation, AssociativeOper
         """Associative folding for BitwiseAnd reps. BitwiseOr of the given operands."""
 
     def _common_associative_fold_of_pair(
-        self, term1: WorldObject, term2: WorldObject, vanishing_const: Constant, dominating_const: Constant
+        self, sub_term: WorldObject, term: WorldObject, vanishing_const: Constant, dominating_const: Constant
     ) -> bool:
         """
-        Fold strategy of all operands of BitwiseAnd and BitwiseOr.
+        Associative folding strategy of the given two operands of an BitwiseAnd resp. BitwiseOr operation.
+
+        We return True when we replace sub_term in term by any constant.
 
         The vanishing constant is the constant that we remove if it is an operand.
         The dominating constant is the constant that makes all other operands obsolete,
             i.e., we can remove all other operands if it is an operand
+
+        1. We replace sub_term in term by the vanishing_constant,
+            i.e., self: Or sub_term = a and term_2 = a & b -> term_2 = False & b;
+                  self: And sub_term = a and term_2 = a | b -> term_2 = True | b
+        2. We replace !sub_term in term by the dominating_constant if sub_term is a bitwise negate,
+            i.e., self: Or sub_term = !a and term_2 = a & b -> term_2 = True & b;
+                  self: And sub_term = !a and term_2 = a | b -> term_2 = False | b
+        3. We split sub_term and term in 3 sets, common-operands, and unique-operands of sub_term and term.
+            - If each operand from sub_term is also an operand of term, then remove term.
+            - If the one unique part is the negation of the other unique part, then remove term and sub_term and add the term consisting
+              of the common operands.
         """
         neg_class = self._negated_class
-        class_operation = self.__class__(self.world)
-        neg_operation = neg_class(self.world)
-        if not isinstance(term2, BitwiseOperation) or (isinstance(term1, Operation) and term1.variable_count() > term2.variable_count()):
+        if not isinstance(term, BitwiseOperation) or not self._can_be_contained_in(sub_term, term):
             return False
-        if term2.replace_term_by(term1, vanishing_const):
-            return True
-        if isinstance(term1, BitwiseNegate) and term2.replace_term_by(term1.operand, dominating_const):
+        if term.replace_term_by(sub_term, vanishing_const):
             return True
 
-        if isinstance(term1, neg_class) and isinstance(term2, neg_class):
-            operands = [op.operand if isinstance(op, BitwiseNegate) else self.world.bitwise_negate(op) for op in term1.operands]
-            if term2.replace_term_by(class_operation.copy().replace_operands(operands), dominating_const):
+        if (negated_sub_term := self._get_negated_term(sub_term)) is None:
+            return False
+        if term.replace_term_by(negated_sub_term, dominating_const):
+            return True
+
+        if isinstance(sub_term, neg_class) and isinstance(term, neg_class):
+            common_operands, unique_operands_sub_term, unique_operands_term = self._get_common_and_unique_operands(sub_term, term)
+            if len(unique_operands_sub_term) == 0:
+                self.remove_operand(term)
                 return True
-            common_operands, operands_1, operands_2 = self._get_common_and_unique_operands(term1, term2)
-            if len(operands_1) == 0:
-                self.remove_operand(term2)
-                return True
-            op_1 = operands_1.pop() if len(operands_1) == 1 else neg_operation.copy().replace_operands(operands_1)
-            op_2 = operands_2.pop() if len(operands_2) == 1 else neg_operation.copy().replace_operands(operands_2)
-            if (isinstance(op_1, BitwiseNegate) and self.world.compare(op_1.operand, op_2)) or (
-                isinstance(op_2, BitwiseNegate) and self.world.compare(op_1, op_2.operand)
-            ):
-                new_operand = neg_operation.copy().replace_operands(common_operands) if len(common_operands) > 1 else common_operands[0]
-                self.remove_operand(term1)
-                self.remove_operand(term2)
-                self.add_operand(new_operand)
+            junction_unique_sub_term = self._get_junction_of_operands(unique_operands_sub_term)
+            junction_unique_term = self._get_junction_of_operands(unique_operands_term)
+            if self._are_complementary(junction_unique_sub_term, junction_unique_term):
+                new_operand = self._get_junction_of_operands(common_operands)
+                self._replace_operands([sub_term, term], new_operand)
                 return True
         return False
+
+    def _replace_operands(self, operands: List[WorldObject], new_operand: WorldObject):
+        """Replace the operands by the new operand."""
+        for operand in operands:
+            self.remove_operand(operand)
+        self.add_operand(new_operand)
+
+    def _get_junction_of_operands(self, unique_operands: Set[WorldObject]):
+        """Return junction of the given list of operands."""
+        if len(unique_operands) == 1:
+            return unique_operands.pop()
+        return self._negated_class(self.world).copy().replace_operands(unique_operands)
 
     def _common_factorize(self) -> Optional[Union[BitwiseOr, BitwiseAnd]]:
         """Factorize strategy of all operands of BitwiseAnd and BitwiseOr."""
@@ -265,6 +284,30 @@ class CommonBitwiseAndOr(BitwiseOperation, CommutativeOperation, AssociativeOper
         neg_operation = neg_class(self.world).replace_operands(common_suboperands.union({same_operation}))
         same_operation.simplify()
         return neg_operation
+
+    @staticmethod
+    def _can_be_contained_in(sub_term: WorldObject, term: BitwiseOperation) -> bool:
+        """Check whether sub_term can be contained in term."""
+        return not isinstance(sub_term, Operation) or sub_term.variable_count() <= term.variable_count()
+
+    def _get_negated_term(self, term: WorldObject) -> Optional[WorldObject]:
+        """Get negation of term when it is a BitwiseNegate, BitwiseAnd or BitwiseOr."""
+        if isinstance(term, BitwiseNegate):
+            return term.operand
+        if isinstance(term, BitwiseAnd):
+            operands = [op.operand if isinstance(op, BitwiseNegate) else self.world.bitwise_negate(op) for op in term.operands]
+            return self.world.bitwise_or(*operands)
+        if isinstance(term, BitwiseOr):
+            operands = [op.operand if isinstance(op, BitwiseNegate) else self.world.bitwise_negate(op) for op in term.operands]
+            return self.world.bitwise_and(*operands)
+
+        return None
+
+    def _are_complementary(self, term1: WorldObject, term2: WorldObject) -> bool:
+        """Check whether the given terms are complementary to each other."""
+        return (isinstance(term1, BitwiseNegate) and self.world.compare(term1.operand, term2)) or (
+            isinstance(term2, BitwiseNegate) and self.world.compare(term1, term2.operand)
+        )
 
 
 class BitwiseAnd(CommonBitwiseAndOr):
