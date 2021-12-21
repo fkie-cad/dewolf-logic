@@ -175,6 +175,8 @@ class TestBitwiseAnd:
             ("v@4 = (& (| x@4 a@4) (| x@4 b@4))", "(| x (& a b))"),
             ("v@4 = (| (& a@4 y@4) (& y@4 b@4))", "(& y (| a b))"),
             ("v@4 = (& (| (& x@4 y@4) a@4) (| (& x y) b@4))", "(| (& x y) (& a b))"),
+            ("v@4 = (& (| x@4 a@4) (| x@4 b@4) (! z@4))", "(& (| x@4 a@4) (| x@4 b@4) (! z@4))"),
+            ("v@4 = (& (| x@4 a@4) (| x@4 b@4) (! (| z@4 x@4)))", "(& (| x@4 a@4) (| x@4 b@4) (! (| z@4 x@4)))"),
         ],
     )
     def test_factorize(self, lhs, rhs):
@@ -182,6 +184,13 @@ class TestBitwiseAnd:
         w.from_string(lhs)
         w.simplify()
         assert World.compare(w.from_string("v"), w.from_string(rhs))
+
+    def test_factorize_does_nothing(self):
+        w = World()
+        w.from_string("v@4 = (& (| x@4 a@4) (| x@4 b@4) (& z@4 x@4))")
+        term: BitwiseAnd = w.get_definition(w.from_string("v"))  # type: ignore
+        term.factorize()
+        assert World.compare(w.from_string("v"), w.from_string("(& (| x@4 a@4) (| x@4 b@4) (& z@4 x@4))"))
 
 
 class TestBitwiseOr:
