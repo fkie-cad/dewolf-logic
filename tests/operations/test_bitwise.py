@@ -98,27 +98,22 @@ class TestBitwiseAnd:
             w.simplify()
             assert World.compare(w.get_definition(w.variable("v", 8)), w.from_string("(| c@8 (& (| x@8 d@8) a@8 b@8))"))
 
-        # This simplification is not correct:
-        # a xor b = (a | b) & ~(a & b), but
-        # (a xor b) & (a xor b xor c) = (a | b) & ~(a & b) & ( (a xor b) | c) & ~( (a xor b) & c)
-        #   = (a | b) & ~(a & b) & ( ((a | b) & ~(a & b)) | c) & ~( ((a | b) & ~(a & b)) & c)
-        #   = (a | b) & (~a | ~b) & ( ((a | b) & (~a | ~b)) | c) & ( (~a & ~b) | (a & b) | ~c)
-        #   = (a | b) & (~a | ~b) & (a | b | c) & (~a | ~b | c) & ( (~a & ~b) | (a & b) | ~c)
-        #   = (a | b) & (~a | ~b) & ( (~a & ~b) | (a & b) | ~c)
-        #   = (a | b) & (~a | ~b) & ~c
-        #   = (a xor b) & ~c
-        # def test_associative_folding_2(self):
-        #     """(a xor b) & (a xor b xor c) = (a xor b)"""
-        #     w = World()
-        #     w.define(
-        #         w.variable("v", 8),
-        #         w.bitwise_and(
-        #             w.bitwise_xor(w.variable("a", 8), w.variable("b", 8)),
-        #             w.bitwise_xor(w.variable("a", 8), w.variable("b", 8), w.variable("c", 8)),
-        #         ),
-        #     )
-        #     w.simplify()
-        #     assert World.compare(w.get_definition(w.variable("v", 8)), w.bitwise_xor(w.variable("a", 8), w.variable("b", 8)))
+        @pytest.mark.skip(f"Not implemented yet!")
+        def test_associative_folding_2(self):
+            """(a xor b) & (a xor b xor c) = (a xor b) & ~c"""
+            w = World()
+            w.define(
+                w.variable("v", 8),
+                w.bitwise_and(
+                    w.bitwise_xor(w.variable("a", 8), w.variable("b", 8)),
+                    w.bitwise_xor(w.variable("a", 8), w.variable("b", 8), w.variable("c", 8)),
+                ),
+            )
+            w.simplify()
+            assert World.compare(
+                w.get_definition(w.variable("v", 8)),
+                w.bitwise_and(w.bitwise_xor(w.variable("a", 8), w.variable("b", 8)), w.bitwise_negate(w.variable("c", 8))),
+            )
 
         def test_associative_folding_3(self):
             """(a | b) & (c | a | b) = (a | b)"""

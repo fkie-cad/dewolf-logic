@@ -335,3 +335,26 @@ class TestFreeConditions:
         assert hash(and_cond.operands[1]) != hash(neg_cond.operand) and str(and_cond.operands[1]) == str(neg_cond.operand)
         assert hash(and_cond.operands[1]) != hash(and_con2.operands[0]) and str(and_cond.operands[1]) == str(and_con2.operands[0])
         assert hash(and_con2.operands[0]) != hash(neg_cond.operand) and str(and_con2.operands[0]) == str(neg_cond.operand)
+
+
+class TestSimplification:
+    @pytest.mark.parametrize(
+        "condition, simplified_cond",
+        [
+            (
+                "(& x1@1 (~ x2@1) (| x3@1 (~ (& x4@1 x2@1))) (~ (& x5@1 x2@1 (~x1@1))))",
+                "(& x1@1 (~ x2@1))",
+            ),
+            ("(| x1@1 (& x2@1 (~ x1@1)) (& x3@1 (~ (| x1@1 x2@1))) (& x5@1 x4@1 (~ x1@1)))", "(| x1@1 x2@1 x3@1 (& x5@1 x4@1))"),
+            (
+                "(| (& x1@1 (~ x1@1)) (~ x2@1) (& x3@1 (| x4@1 (~ x4@1))) (~ (& x5@1 x2@1 (~ x1@1))) (& (~ (& x5@1 (~ x5@1))) x1@1) (~ (| x3@1 (~ x3@1))))",
+                "(| x1@1 (~ x5@1) (~ x2@1) x3@1)",
+            ),
+        ],
+    )
+    def test_simplify_node(self, condition, simplified_cond):
+        w = World()
+        cond = w.from_string(condition)
+        w.define(var := w.variable("v", 8), cond)
+        var.simplify()
+        assert w.compare(w.get_definition(var), w.from_string(simplified_cond))

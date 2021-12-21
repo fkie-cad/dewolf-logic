@@ -1,6 +1,6 @@
 """Module implementing the main logic container class."""
 import logging
-from typing import Dict, Iterable, Iterator, List, Optional, TypeVar
+from typing import Dict, Iterable, Iterator, List, Optional, Set, TypeVar
 
 from simplifier.operations.interface import CommutativeOperation
 from simplifier.world.coloring import GraphColoringGenerator
@@ -53,17 +53,21 @@ class WorldInterface:
 
         while in_degree_larger_one_operations:
             operation = in_degree_larger_one_operations.pop()
-            operand_edges = self._graph.get_out_edges(operation)
-            relations = {relation for relation in self._graph.get_in_edges(operation) if relation.source in condition_nodes}
-            condition_nodes.remove(operation)
-            for in_relation in relations:
-                copy_node = operation.copy()
-                condition_nodes.add(copy_node)
-                for relation in operand_edges:
-                    self._graph.add_edge(relation.copy(source=copy_node))
-                    if self._graph.in_degree(relation.sink) > 1:
-                        in_degree_larger_one_operations.add(relation.sink)
-                self._graph.substitute_edge(in_relation, in_relation.copy(sink=copy_node))
+            self._free_operation_node(operation, condition_nodes, in_degree_larger_one_operations)
+
+    def _free_operation_node(self, operation: Operation, condition_nodes: Set[WorldObject], in_degree_larger_one_operations):
+        """Copy the given operation in the condition to obtain in-degree one for this operation in the condition."""
+        operand_edges = self._graph.get_out_edges(operation)
+        in_relations_operation = {relation for relation in self._graph.get_in_edges(operation) if relation.source in condition_nodes}
+        condition_nodes.remove(operation)
+        for in_relation in in_relations_operation:
+            copy_node = operation.copy()
+            condition_nodes.add(copy_node)
+            for relation in operand_edges:
+                self._graph.add_edge(relation.copy(source=copy_node))
+                if self._graph.in_degree(relation.sink) > 1:
+                    in_degree_larger_one_operations.add(relation.sink)
+            self._graph.substitute_edge(in_relation, in_relation.copy(sink=copy_node))
 
     def __len__(self) -> int:
         """Return the number of WorldObjects."""
