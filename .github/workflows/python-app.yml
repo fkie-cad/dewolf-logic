@@ -1,0 +1,32 @@
+name: Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  run-tests:
+    runs-on: ubuntu-latest
+    container:
+      image: python:3.8
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Pip Requirements
+        run: |
+          pip install -r requirements.txt
+      - name: Run Checks
+        run: |
+          black --check .
+          mypy -p simplifier
+          pydocstyle
+          isort -c .
+          coverage run --source . -m pytest
+          coverage report
+          coverage xml
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v2
+        with:
+          name: Coverage
+          path: coverage.xml
