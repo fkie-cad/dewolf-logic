@@ -26,6 +26,8 @@ setup(
     ],
     keywords="logic, assembly, decompiler, conditions",
     packages=find_packages(include=["simplifier", "simplifier.*"]),
+    package_data={"": ["*.lark"]},
+    include_package_data=True,
     python_requires=">=3.8, <4",
     install_requires=["networkx", "lark~=0.11.1"],
     extras_require={
