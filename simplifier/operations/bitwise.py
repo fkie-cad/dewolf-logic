@@ -374,6 +374,36 @@ class BitwiseAnd(CommonBitwiseAndOr):
         """
         return self._common_factorize()  # type: ignore
 
+    def get_equivalent_or_condition(self, disjunction: BitwiseOr) -> BitwiseOr:
+        """
+        Create the new Or-condition that is equivalent to self and replace self by it.
+
+        - disjunction must be a term of the BitwiseOr formula self.
+
+        self = (a1 | a2 | ... | ak) & l1 & l2 & ... & lh, where disjunction = (a1 | a2 | ... | ak), remaining_conditions = [l1, l2, ..., lh]
+        and each li is a condition
+        -> new_condition = (a1 & l1 & ... & lh) | (a2 & l1 & ... & lh) | ... | (ak & l1 & ... & lh)
+        """
+        conditions = [
+            self.world.bitwise_and(arg, *(cond.copy_tree() for cond in self.operands if hash(cond) != hash(disjunction)))
+            for arg in disjunction.operands
+        ]
+        new_condition = self.world.bitwise_or(*conditions)
+        for cond in new_condition.operands:
+            cond.simplify(keep_form=True)
+        self.world.replace(self, new_condition)
+        return new_condition
+
+    def get_disjunction(self) -> Optional[BitwiseOr]:
+        """If the And-formula has a literal that is a disjunction, then return it, otherwise return None."""
+        for child in self.operands:
+            if isinstance(child, BitwiseNegate):
+                if resolved_neg := child.dissolve_negation():
+                    child = resolved_neg
+            if isinstance(child, BitwiseOr):
+                return child
+        return None
+
     @property
     def _negated_class(self) -> Type[BitwiseOr]:
         """Return BitwiseOr, which corresponds to ~BitwiseAnd."""
@@ -450,7 +480,7 @@ class BitwiseOr(CommonBitwiseAndOr):
         """
         Create the new And-condition that is equivalent to self and replace self by it.
 
-        - conjunction must be a term of the BitwiseOr formula self.
+        - conjunction must be a term of the BitwiseAnd formula self.
 
         self = (a1 & a2 & .. & ak) | l1 | l2 | ... | lh, where conjunction = (a1 & a2 & .. & ak), remaining_conditions = [l1, l2, ..., lh]
         and each li is a condition
