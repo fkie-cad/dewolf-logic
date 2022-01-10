@@ -98,8 +98,9 @@ class TestBitwiseAnd:
             w.simplify()
             assert World.compare(w.get_definition(w.variable("v", 8)), w.from_string("(| c@8 (& (| x@8 d@8) a@8 b@8))"))
 
+        @pytest.mark.skip(f"Not implemented yet!")
         def test_associative_folding_2(self):
-            """(a xor b) & (a xor b xor c) = (a xor b)"""
+            """(a xor b) & (a xor b xor c) = (a xor b) & ~c"""
             w = World()
             w.define(
                 w.variable("v", 8),
@@ -109,7 +110,10 @@ class TestBitwiseAnd:
                 ),
             )
             w.simplify()
-            assert World.compare(w.get_definition(w.variable("v", 8)), w.bitwise_xor(w.variable("a", 8), w.variable("b", 8)))
+            assert World.compare(
+                w.get_definition(w.variable("v", 8)),
+                w.bitwise_and(w.bitwise_xor(w.variable("a", 8), w.variable("b", 8)), w.bitwise_negate(w.variable("c", 8))),
+            )
 
         def test_associative_folding_3(self):
             """(a | b) & (c | a | b) = (a | b)"""
@@ -144,12 +148,30 @@ class TestBitwiseAnd:
             w.simplify()
             assert World.compare(w.get_definition(w.variable("v", 8)), w.bitwise_and(w.variable("a", 8), w.variable("b", 8)))
 
+        def test_associative_folding_6(self):
+            """(x | y) & ( x | ~y ) = x because (x | y) & ( x | ~y ) = x & (y | ~y) = x & True = x"""
+            w = World()
+            cond = w.from_string("(& (| x@1 y@1) (| x@1 (~y@1)) )")
+            w.define(v := w.variable("v", 1), cond)
+            w.simplify()
+            assert World.compare(v, w.from_string("x@1"))
+
+        def test_associative_folding_7(self):
+            """(~x | ~y) & (z | (x & y)) = (~x | ~y) & z"""
+            w = World()
+            cond = w.from_string("(& (| (~x@1) (~y@1)) (| z@1 (& x@1 y@1)) )")
+            w.define(v := w.variable("v", 1), cond)
+            w.simplify()
+            assert World.compare(v, w.from_string("(& (| (~ x@1) (~ y@1) ) z@1)"))
+
     @pytest.mark.parametrize(
         "lhs, rhs",
         [
             ("v@4 = (& (| x@4 a@4) (| x@4 b@4))", "(| x (& a b))"),
             ("v@4 = (| (& a@4 y@4) (& y@4 b@4))", "(& y (| a b))"),
             ("v@4 = (& (| (& x@4 y@4) a@4) (| (& x y) b@4))", "(| (& x y) (& a b))"),
+            ("v@4 = (& (| x@4 a@4) (| x@4 b@4) (! z@4))", "(& (| x@4 a@4) (| x@4 b@4) (! z@4))"),
+            ("v@4 = (& (| x@4 a@4) (| x@4 b@4) (! (| z@4 x@4)))", "(& (| x@4 a@4) (| x@4 b@4) (! (| z@4 x@4)))"),
         ],
     )
     def test_factorize(self, lhs, rhs):
@@ -157,6 +179,13 @@ class TestBitwiseAnd:
         w.from_string(lhs)
         w.simplify()
         assert World.compare(w.from_string("v"), w.from_string(rhs))
+
+    def test_factorize_does_nothing(self):
+        w = World()
+        w.from_string("v@4 = (& (| x@4 a@4) (| x@4 b@4) (& z@4 x@4))")
+        term: BitwiseAnd = w.get_definition(w.from_string("v"))  # type: ignore
+        term.factorize()
+        assert World.compare(w.from_string("v"), w.from_string("(& (| x@4 a@4) (| x@4 b@4) (& z@4 x@4))"))
 
 
 class TestBitwiseOr:
@@ -220,6 +249,13 @@ class TestBitwiseOr:
             w.define(w.variable("v", 8), w.bitwise_or(w.variable("x", 8), w.bitwise_and(w.variable("x", 8), w.variable("y", 8))))
             w.simplify()
             assert World.compare(w.get_definition(w.variable("v", 8)), w.variable("x", 8))
+
+        def test_variable_folding_multiple_times(self):
+            """z | x | (x & y & z) = x | z"""
+            w = World()
+            w.define(w.variable("v", 8), w.from_string("(| z@8 y@8 (& x@8 y@8 z@8))"))
+            w.simplify()
+            assert World.compare(w.get_definition(w.variable("v", 8)), w.from_string("(| z@8 y@8)"))
 
         def test_xor_folding(self):
             """x | (x ^ y) = x | y"""
@@ -311,6 +347,14 @@ class TestBitwiseOr:
                 w.get_definition(w.variable("v", 8)),
                 w.bitwise_or(w.bitwise_and(w.variable("a", 8), w.variable("c", 8)), w.variable("b", 8)),
             )
+
+        def test_associative_folding_multiple(self):
+            """((~x1 & x2 & ~x3 & x5) | (x3 | ~x2 | x1 | ~x5)) = True"""
+            w = World()
+            term = w.from_string("(| (& (~ x1@1) x2@1 (~ x3@1) x5@1) (| x3@1 (~ x2@1) x1@1 (~ x5@1)) )")
+            w.define(var := w.variable("v", 1), term)
+            w.simplify()
+            assert World.compare(w.get_definition(var), Constant(w, 1, 1))
 
         @pytest.mark.skip(reason="Not implemented yet, may be complicated")
         def test_associative_folding_4(self):
@@ -406,6 +450,22 @@ class TestBitwiseOr:
                 ),
             )
 
+        def test_associative_folding_8(self):
+            """(x & y) | ( x & !y ) = x because (x & y) | ( x & !y ) = x | (y & !y) = x | False = x"""
+            w = World()
+            cond = w.from_string("(| (& x@1 y@1) (& x@1 (~y@1)) )")
+            w.define(v := w.variable("v", 1), cond)
+            w.simplify()
+            assert World.compare(v, w.from_string("x@1"))
+
+        def test_associative_folding_9(self):
+            """(~x & ~y) | (z & (x | y)) = (~x & ~y) | z"""
+            w = World()
+            cond = w.from_string("(| (& (~x@1) (~y@1)) (& z@1 (| x@1 y@1)) )")
+            w.define(v := w.variable("v", 1), cond)
+            w.simplify()
+            assert World.compare(v, w.from_string("(| (& (~ x@1) (~ y@1) ) z@1)"))
+
     class TestFactorize:
         def test_factorize(self):
             """(x & y) | (x & z) = x & (y | z)"""
@@ -434,12 +494,22 @@ class TestBitwiseOr:
 
 
 class TestBitwiseXor:
-    def test_duplicate_folding(self):
-        """x ^ x ^ x = x"""
+    @pytest.mark.parametrize(
+        "term, result",
+        [
+            ("(^ x@8 x@8 x@8)", "x@8"),
+            ("(^ x@8 x@8 z@8)", "z@8"),
+            ("(^ x@8 x@8)", "0@8"),
+            ("(^ x@8 0@8)", "x@8"),
+            ("(^ x@8 255@8)", "(~ x@8)"),
+        ],
+    )
+    def test_simplify(self, term, result):
+        """Simplifications for xor."""
         w = World()
-        w.define(w.variable("v", 8), w.bitwise_xor(w.variable("x", 8), w.variable("x", 8), w.variable("x", 8)))
+        w.define(v := w.variable("v", 8), w.from_string(term))
         w.simplify()
-        assert World.compare(w.get_definition(w.variable("v", 8)), w.variable("x", 8))
+        assert World.compare(v, w.from_string(result))
 
     @pytest.mark.parametrize(
         "a, b",
@@ -468,6 +538,49 @@ class TestBitwiseNegate:
         negation = w.from_string("(~v@4)")
         with pytest.raises(ValueError):
             negation.add_operand(w.from_string("t@2"))
+
+    @pytest.mark.parametrize(
+        "term, result",
+        [
+            ("(~1@1)", "0@1"),
+            ("(~0@1)", "1@1"),
+            ("(~0@3)", "-1@3"),
+            ("(~1@3)", "-2@3"),
+            ("(~2@3)", "-3@3"),
+            ("(~3@3)", "-4@3"),
+            ("(~4@3)", "3@3"),
+            ("(~5@3)", "2@3"),
+            ("(~6@3)", "1@3"),
+            ("(~7@3)", "0@3"),
+        ],
+    )
+    def test_eval_negate_constants(self, term, result):
+        w = World()
+        term = w.from_string(term)  # type: BitwiseNegate
+        constant = term.eval(term.operands)
+        assert w.compare(constant, w.from_string(result))
+
+    @pytest.mark.parametrize(
+        "term, result",
+        [
+            ("(~1@1)", "0@1"),
+            ("(~0@1)", "1@1"),
+            ("(~0@3)", "-1@3"),
+            ("(~1@3)", "-2@3"),
+            ("(~2@3)", "-3@3"),
+            ("(~3@3)", "-4@3"),
+            ("(~4@3)", "3@3"),
+            ("(~5@3)", "2@3"),
+            ("(~6@3)", "1@3"),
+            ("(~7@3)", "0@3"),
+        ],
+    )
+    def test_collapse_constants(self, term, result):
+        w = World()
+        term = w.from_string(term)  # type: BitwiseNegate
+        w.define(var := w.variable("v", 1), term)
+        term.collapse()
+        assert w.compare(var, w.from_string(result))
 
 
 class TestNegation:

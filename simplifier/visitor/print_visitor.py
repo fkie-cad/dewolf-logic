@@ -28,9 +28,12 @@ class PrintVisitor(WorldObjectVisitor):
 
     def print_operation(self, op: Operation) -> str:
         """Print a non-unary operation."""
-        if operands := op.operands:
+        operands = op.operands
+        if len(operands) > 1:
             spaced_symbol = f" {op.SYMBOL} "
             return f"({spaced_symbol.join([self.visit(op) for op in operands])})"
+        if len(operands) == 1:
+            return self.visit(operands[0])
         return f"({op.SYMBOL})"
 
     def print_rotate(self, op: Operation) -> str:

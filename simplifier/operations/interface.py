@@ -41,7 +41,7 @@ class AssociativeOperation(Operation, ABC):
     e.g. (a + b) + c = a + (b + c)
     """
 
-    def _promote_single_operand(self):
+    def _promote_single_operand(self) -> WorldObject:
         """
         Check if there is only a single operand left after folding constants and variables.
 
@@ -50,17 +50,18 @@ class AssociativeOperation(Operation, ABC):
         """
         operands = self.operands
         if len(operands) != 1:
-            return
+            return self
         self.remove_operand(operands[0])
         self.world.replace(self, operands[0])
+        return operands[0]
 
     def simplify(self, keep_form: bool = False) -> Optional[WorldObject]:
         """Simplify the operation by promoting single operands as well."""
         super().simplify(keep_form)
         operands = self.operands
-        self._promote_single_operand()
+        operation = self._promote_single_operand()
         if len(operands) == 1:
-            return operands[0]
+            return operation
         return None
 
 
@@ -97,7 +98,7 @@ class CommutativeOperation(Operation, ABC):
                     self.add_operand(suboperand)
                 self.remove_operand(operand)
 
-    def _promote_single_operand(self):
+    def _promote_single_operand(self) -> WorldObject:
         """
         Check if there is only a single operand left after folding constants and variables.
 
@@ -106,9 +107,10 @@ class CommutativeOperation(Operation, ABC):
         """
         operands = self.operands
         if len(operands) != 1:
-            return
+            return self
         self.remove_operand(operands[0])
         self.world.replace(self, operands[0])
+        return operands[0]
 
     def simplify(self, keep_form: bool = False) -> Optional[WorldObject]:
         """

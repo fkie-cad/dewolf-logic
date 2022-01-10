@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Generic, List, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, Generic, Iterable, List, Optional, TypeVar, Union
 
 from simplifier.common import T
 from simplifier.util.decorators import clean, dirty
@@ -106,6 +106,17 @@ class BaseVariable(BitVector, ABC):
     def accept(self, visitor: WorldObjectVisitor[T]) -> T:
         """Invoke the appropriate visitor for Variable."""
         return visitor.visit_variable(self)
+
+    def simplify(self):
+        """Simplify the term defined by the variable."""
+        from simplifier.operations import BitwiseNegate
+
+        for node in list(self.world.iter_postorder(self)):
+            if isinstance(node, BitwiseNegate):
+                node.dissolve_negation()
+        for node in list(self.world.iter_postorder(self)):
+            if isinstance(node, Operation):
+                node.simplify()
 
 
 class Variable(BaseVariable):
@@ -274,12 +285,13 @@ class Operation(WorldObject, ABC):
         self.world.replace(original, new)
 
     @dirty
-    def replace_operands(self, operands: List[WorldObject]):
+    def replace_operands(self, operands: Iterable[WorldObject]) -> Operation:
         """Replace all current operands with the list of new operands."""
         for operand in self.operands:
             self.remove_operand(operand)
         for operand in operands:
             self.add_operand(operand)
+        return self
 
     def copy(self) -> Operation:
         """Generate a copy of the current Operation."""

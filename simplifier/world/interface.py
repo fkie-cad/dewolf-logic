@@ -1,7 +1,8 @@
 """Module implementing the main logic container class."""
 import logging
-from typing import Dict, Iterable, Iterator, List, Optional, TypeVar
+from typing import Dict, Iterable, Iterator, List, Optional, Set, TypeVar
 
+from simplifier.operations.interface import CommutativeOperation
 from simplifier.world.coloring import GraphColoringGenerator
 from simplifier.world.edges import DefinitionEdge, OperandEdge, WorldRelation
 from simplifier.world.graphs import Graph
@@ -36,6 +37,37 @@ class WorldInterface:
         """
         self._graph = Graph()
         self._variables: Dict[str, BaseVariable] = dict()
+
+    def free_world_condition(self, condition: WorldObject):
+        """
+        Copy operations such that each node of the condition has only in-degree 1.
+
+        If a condition is given, do it only for this condition, otherwise for the whole world.
+        """
+        in_degree_larger_one_operations = set()
+        condition_nodes = set()
+        for node in self.iter_postorder(condition):
+            if isinstance(node, Operation) and self._graph.in_degree(node) > 1:
+                in_degree_larger_one_operations.add(node)
+            condition_nodes.add(node)
+
+        while in_degree_larger_one_operations:
+            operation = in_degree_larger_one_operations.pop()
+            self._free_operation_node(operation, condition_nodes, in_degree_larger_one_operations)
+
+    def _free_operation_node(self, operation: Operation, condition_nodes: Set[WorldObject], in_degree_larger_one_operations):
+        """Copy the given operation in the condition to obtain in-degree one for this operation in the condition."""
+        operand_edges = self._graph.get_out_edges(operation)
+        in_relations_operation = {relation for relation in self._graph.get_in_edges(operation) if relation.source in condition_nodes}
+        condition_nodes.remove(operation)
+        for in_relation in in_relations_operation:
+            copy_node = operation.copy()
+            condition_nodes.add(copy_node)
+            for relation in operand_edges:
+                self._graph.add_edge(relation.copy(source=copy_node))
+                if self._graph.in_degree(relation.sink) > 1:
+                    in_degree_larger_one_operations.add(relation.sink)
+            self._graph.substitute_edge(in_relation, in_relation.copy(sink=copy_node))
 
     def __len__(self) -> int:
         """Return the number of WorldObjects."""
@@ -108,6 +140,14 @@ class WorldInterface:
             return True
         return False
 
+    def replace_operand(self, operation: Operation, replacee_operand: WorldObject, replacement_operand: WorldObject):
+        """Replace the operand replacee by the operand replacement in the given operation."""
+        edges = self._graph.get_edges(operation, replacee_operand)
+        for edge in edges:
+            self._graph.remove_edge(edge)
+            self._graph.add_node(node := replacement_operand.copy())
+            self._graph.add_edge(edge.copy(sink=node))
+
     def add_operation_on_edge(self, edge: WorldRelation, operation: Operation):
         """Add the given operation on the given edge, by splitting it."""
         new_operation = self._add_operation(operation, [edge.sink])
@@ -150,7 +190,6 @@ class WorldInterface:
             return True
         if a != b and not _contains_defining_variable(a, b):
             return False
-
         graph_coloring_generator = GraphColoringGenerator()
         graph_coloring_generator.color_subtree_with_head(a)
         graph_coloring_generator.color_subtree_with_head(b)
