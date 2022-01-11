@@ -256,16 +256,15 @@ class TestDNF:
             ),
         )
 
-    # def test_negated_formula(self):
-    #     w = World()
-    #     w.define(var := w.variable("v", 8), w.from_string("(~ (| (& (~x1@8) x2@8) (&x3@8 (~x1@8)) ))"))
-    #     ToDnfVisitor(var)
-    #     assert World.compare(w.get_definition(w.variable("v", 8)), w.from_string("(| x1@8 (& (~x3@8) (~x2@8)))"))
+    def test_negated_formula(self):
+        w = World()
+        w.define(var := w.variable("v", 8), w.from_string("(~ (| (& (~x1@8) x2@8) (&x3@8 (~x1@8)) ))"))
+        ToDnfVisitor(var)
+        assert World.compare(w.get_definition(w.variable("v", 8)), w.from_string("(| x1@8 (& (~x3@8) (~x2@8)))"))
 
     def test_partial_and_simplify_changes_or(self):
         """Start at a sub-formula and simplify changes and to or."""
         w = World()
-        # formula = w.from_string("(|  1@1 (& a@1 (| (~b@1) c@1)) )")
         formula = w.from_string("(|  0@1 (& a@1 (| (~b@1) c@1)) )")
         w.define(var := w.variable("v", 1), w.bitwise_negate(formula))
         ToDnfVisitor(formula)
@@ -278,3 +277,10 @@ class TestDNF:
         w.define(var := w.variable("v", 1), w.bitwise_negate(formula))
         ToDnfVisitor(formula)
         assert World.compare(w.get_definition(var), w.from_string("(~ (| a@1 (& (~b@1) c@1)) )"))
+
+    def test_bitwise_or_to_true(self):
+        w = World()
+        formula = w.from_string("(|  1@1 (& a@1 (| (~b@1) c@1)) )")
+        w.define(var := w.variable("v", 1), w.bitwise_negate(formula))
+        ToDnfVisitor(formula)
+        assert World.compare(w.get_definition(var), w.bitwise_negate(w.from_string("1@1")))
