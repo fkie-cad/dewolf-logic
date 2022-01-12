@@ -152,7 +152,7 @@ class SingleRangeSimplifier:
 
 @dataclass
 class ConstantBound:
-    """Dataclass maintaining the bound of an world-object."""
+    """Dataclass maintaining the bound of a world-object."""
 
     signed: Optional[Constant] = None
     unsigned: Optional[Constant] = None
@@ -283,6 +283,7 @@ class ExpressionValues:
 
     def simplify(self):
         """Simplify the given possible value sets."""
+        self._remove_redundant_bounds()
         self._add_must_value_if_bounds_equal_size_bounds()
         self._refine_bounds_using_forbidden_values()
         self._remove_redundant_forbidden_values()
@@ -316,6 +317,107 @@ class ExpressionValues:
             self.must_values.add(first_const_bound.signed)
         if first_const_bound.unsigned and first_const_bound.unsigned == second_const_bound.unsigned:
             self.must_values.add(first_const_bound.unsigned)
+
+    def _remove_redundant_bounds(self) -> None:
+        """Remove redundant bounds if signed and unsigned exist."""
+        if self.upper_bound.signed and self.upper_bound.unsigned:
+            self._combine_signed_unsigned_upper_bounds()
+        if self.lower_bound.signed and self.lower_bound.unsigned:
+            self._combine_singed_unsigned_lower_bounds()
+        if self.lower_bound.signed and self.upper_bound.unsigned:
+            self._combine_singed_lower_unsigned_upper_bounds()
+        if self.upper_bound.signed and self.lower_bound.unsigned:
+            self._combine_singed_upper_unsigned_lower_bounds()
+
+    def _combine_signed_unsigned_upper_bounds(self):
+        """
+        Combine signed and unsigned values of upper bounds, i.e. x u<= c_u and x s<= c_s
+
+        MS = maximum size of a singed value, i.e., for size 4 it is 8
+        1. c_u <= MS and c_s < 0: (x u<= c_u and x s<= c_s) can be simplified to (0 s<= x <= c_s) which is false
+        2. c_u <= MS and c_s >= 0: (x u<= c_u and x s<= c_s) can be simplified to (x u<= min(c_s, c_u))
+        3. c_u > MS and c_s < 0: (x u<= c_u and x s<= c_s) can be simplified to (x s<= min(c_s, c_u))
+        """
+        upper_size_bound_value_signed = eval_constant(self.size_upper_bound.signed, is_signed=True)
+        signed_upper_bound_value = eval_constant(self.upper_bound.signed, is_signed=True)
+        unsigned_upper_bound_value = eval_constant(self.upper_bound.unsigned, is_signed=False)
+        if unsigned_upper_bound_value <= upper_size_bound_value_signed and signed_upper_bound_value < 0:
+            self.lower_bound.signed = Constant(self.expression.world, 0, self.expression.size)
+            self.upper_bound.unsigned = None
+        elif unsigned_upper_bound_value <= upper_size_bound_value_signed and 0 <= signed_upper_bound_value:
+            if unsigned_upper_bound_value > signed_upper_bound_value:
+                self.upper_bound.unsigned = self.upper_bound.signed
+            self.upper_bound.signed = None
+        elif unsigned_upper_bound_value > upper_size_bound_value_signed and 0 > signed_upper_bound_value:
+            if eval_constant(self.upper_bound.unsigned, is_signed=True) <= signed_upper_bound_value:
+                self.upper_bound.signed = self.upper_bound.unsigned
+            self.upper_bound.unsigned = None
+
+    def _combine_singed_unsigned_lower_bounds(self):
+        """
+        Combine signed and unsigned values of lower bounds, i.e. x u>= c_u and x s>= c_s
+
+        MS = maximum size of a singed value, i.e., for size 4 it is 8
+        1. c_u > MS and c_s >= 0: (x u>= c_u and x s>= c_s) can be simplified to (c_s s<= x < 0) which is false
+        2. c_u > MS and c_s < 0: (x u>= c_u and x s>= c_s) can be simplified to (max(c_s, c_u) u<= x)
+        3. c_u <= MS and c_s >= 0: (x u>= c_u and x s>= c_s) can be simplified to (max(c_s, c_u) s<= x)
+        """
+        upper_size_bound_value_signed = eval_constant(self.size_upper_bound.signed, is_signed=True)
+        signed_lower_bound_value = eval_constant(self.lower_bound.signed, is_signed=True)
+        unsigned_lower_bound_value = eval_constant(self.lower_bound.unsigned, is_signed=False)
+        if signed_lower_bound_value >= 0 and unsigned_lower_bound_value > upper_size_bound_value_signed:
+            self.upper_bound.signed = Constant(self.expression.world, -1, self.expression.size)
+            self.lower_bound.unsigned = None
+        elif unsigned_lower_bound_value <= upper_size_bound_value_signed and signed_lower_bound_value >= 0:
+            if signed_lower_bound_value < unsigned_lower_bound_value:
+                self.lower_bound.signed = self.lower_bound.unsigned
+            self.lower_bound.unsigned = None
+        elif unsigned_lower_bound_value > upper_size_bound_value_signed and signed_lower_bound_value < 0:
+            if eval_constant(self.lower_bound.signed, is_signed=False) >= unsigned_lower_bound_value:
+                self.lower_bound.unsigned = self.lower_bound.signed
+            self.lower_bound.signed = None
+
+    def _combine_singed_lower_unsigned_upper_bounds(self):
+        """
+        Combine signed lower and unsigned upper bound values, i.e. x u<= c_u and x s>= c_s
+
+        MS = maximum size of a singed value, i.e., for size 4 it is 8
+        1. c_u <= MS and c_s < 0: (x u<= c_u and x s>= c_s) can be simplified to (x u<= c_u)
+        2. c_u <= MS and c_s >= 0: (x u<= c_u and x s>= c_s) can be simplified to (c_s u<= x u<= c_u)
+        3. c_u > MS and c_s >= 0: (x u<= c_u and x s>= c_s) can be simplified to (x s>= c_s)
+        """
+        upper_size_bound_value_signed = eval_constant(self.size_upper_bound.signed, is_signed=True)
+        signed_lower_bound_value = eval_constant(self.lower_bound.signed, is_signed=True)
+        unsigned_upper_bound_value = eval_constant(self.upper_bound.unsigned, is_signed=False)
+        if unsigned_upper_bound_value <= upper_size_bound_value_signed and signed_lower_bound_value < 0:
+            self.lower_bound.signed = None
+        elif unsigned_upper_bound_value <= upper_size_bound_value_signed and signed_lower_bound_value >= 0:
+            if signed_lower_bound_value > 0:
+                self.lower_bound.unsigned = self.lower_bound.signed
+            self.lower_bound.signed = None
+        elif unsigned_upper_bound_value > upper_size_bound_value_signed and signed_lower_bound_value >= 0:
+            self.upper_bound.unsigned = None
+
+    def _combine_singed_upper_unsigned_lower_bounds(self):
+        """
+        Combine signed upper and unsigned lower bound values, i.e. x u>= c_u and x s<= c_s
+
+        MS = maximum size of a singed value, i.e., for size 4 it is 8
+        1. c_u <= MS and c_s < 0: (x u>= c_u and x s<= c_s) can be simplified to (x s<= c_s)
+        2. c_u > MS and c_s < 0: (x u>= c_u and x s<= c_s) can be simplified to (c_u s<= x s<= c_s)
+        3. c_u > MS and c_s >= 0: (x u>= c_u and x s<= c_s) can be simplified to (x u>= c_u)
+        """
+        upper_size_bound_value_signed = eval_constant(self.size_upper_bound.signed, is_signed=True)
+        signed_upper_bound_value = eval_constant(self.upper_bound.signed, is_signed=True)
+        unsigned_lower_bound_value = eval_constant(self.lower_bound.unsigned, is_signed=False)
+        if unsigned_lower_bound_value <= upper_size_bound_value_signed and signed_upper_bound_value < 0:
+            self.lower_bound.unsigned = None
+        elif unsigned_lower_bound_value > upper_size_bound_value_signed and signed_upper_bound_value < 0:
+            if eval_constant(self.lower_bound.unsigned, is_signed=True) != -upper_size_bound_value_signed-1:
+                self.lower_bound.signed = self.lower_bound.unsigned
+            self.lower_bound.unsigned = None
+        elif unsigned_lower_bound_value > upper_size_bound_value_signed and signed_upper_bound_value >= 0:
+            self.upper_bound.signed = None
 
 
 class BoundRelation:
