@@ -331,7 +331,7 @@ class ExpressionValues:
 
     def _combine_signed_unsigned_upper_bounds(self):
         """
-        Combine signed and unsigned values of upper bounds, i.e. x u<= c_u and x s<= c_s
+        Combine signed and unsigned values of upper bounds, i.e. x u<= c_u and x s<= c_s.
 
         MS = maximum size of a singed value, i.e., for size 4 it is 8
         1. c_u <= MS and c_s < 0: (x u<= c_u and x s<= c_s) can be simplified to (0 s<= x <= c_s) which is false
@@ -355,7 +355,7 @@ class ExpressionValues:
 
     def _combine_singed_unsigned_lower_bounds(self):
         """
-        Combine signed and unsigned values of lower bounds, i.e. x u>= c_u and x s>= c_s
+        Combine signed and unsigned values of lower bounds, i.e. x u>= c_u and x s>= c_s.
 
         MS = maximum size of a singed value, i.e., for size 4 it is 8
         1. c_u > MS and c_s >= 0: (x u>= c_u and x s>= c_s) can be simplified to (c_s s<= x < 0) which is false
@@ -379,7 +379,7 @@ class ExpressionValues:
 
     def _combine_singed_lower_unsigned_upper_bounds(self):
         """
-        Combine signed lower and unsigned upper bound values, i.e. x u<= c_u and x s>= c_s
+        Combine signed lower and unsigned upper bound values, i.e. x u<= c_u and x s>= c_s.
 
         MS = maximum size of a singed value, i.e., for size 4 it is 8
         1. c_u <= MS and c_s < 0: (x u<= c_u and x s>= c_s) can be simplified to (x u<= c_u)
@@ -400,7 +400,7 @@ class ExpressionValues:
 
     def _combine_singed_upper_unsigned_lower_bounds(self):
         """
-        Combine signed upper and unsigned lower bound values, i.e. x u>= c_u and x s<= c_s
+        Combine signed upper and unsigned lower bound values, i.e. x u>= c_u and x s<= c_s.
 
         MS = maximum size of a singed value, i.e., for size 4 it is 8
         1. c_u <= MS and c_s < 0: (x u>= c_u and x s<= c_s) can be simplified to (x s<= c_s)
@@ -413,7 +413,7 @@ class ExpressionValues:
         if unsigned_lower_bound_value <= upper_size_bound_value_signed and signed_upper_bound_value < 0:
             self.lower_bound.unsigned = None
         elif unsigned_lower_bound_value > upper_size_bound_value_signed and signed_upper_bound_value < 0:
-            if eval_constant(self.lower_bound.unsigned, is_signed=True) != -upper_size_bound_value_signed-1:
+            if eval_constant(self.lower_bound.unsigned, is_signed=True) != -upper_size_bound_value_signed - 1:
                 self.lower_bound.signed = self.lower_bound.unsigned
             self.lower_bound.unsigned = None
         elif unsigned_lower_bound_value > upper_size_bound_value_signed and signed_upper_bound_value >= 0:
