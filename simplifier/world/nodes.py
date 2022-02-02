@@ -79,7 +79,7 @@ class BitVector(WorldObject, Generic[WorldType], ABC):
     @property
     def maximum(self) -> int:
         """Return the maximum value which can be represented."""
-        return 2 ** self._size - 1
+        return 2**self._size - 1
 
     def __eq__(self, other) -> bool:
         """Compare two BitVectors based on their representation."""

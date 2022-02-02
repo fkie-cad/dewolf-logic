@@ -1,0 +1,8 @@
+mode: chatops
+silent: false
+branchName: full
+autoCloseIssue: true
+openDraftPR: true
+copyIssueLabelsToPR: true
+copyIssueAssigneeToPR: true
+copyIssueMilestoneToPR: true

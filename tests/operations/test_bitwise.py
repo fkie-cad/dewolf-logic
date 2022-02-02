@@ -46,7 +46,7 @@ class TestBitwiseAnd:
         def test_bitmask_folding(self):
             """x@8 & b11111111 = x@8"""
             w = World()
-            w.define(w.variable("v", 8), w.bitwise_and(w.variable("x", 8), w.constant(2 ** 8 - 1, 8)))
+            w.define(w.variable("v", 8), w.bitwise_and(w.variable("x", 8), w.constant(2**8 - 1, 8)))
             w.simplify()
             assert World.compare(w.get_definition(w.variable("v", 8)), w.variable("x", 8))
 
@@ -239,9 +239,9 @@ class TestBitwiseOr:
         def test_max_folding(self):
             """x@8 | 0xffffffff = 0xffffffff"""
             w = World()
-            w.define(w.variable("v", 8), w.bitwise_or(w.variable("x", 8), w.constant(2 ** 8 - 1, 8)))
+            w.define(w.variable("v", 8), w.bitwise_or(w.variable("x", 8), w.constant(2**8 - 1, 8)))
             w.simplify()
-            assert World.compare(w.get_definition(w.variable("v", 8)), w.constant(2 ** 8 - 1, 8))
+            assert World.compare(w.get_definition(w.variable("v", 8)), w.constant(2**8 - 1, 8))
 
         def test_variable_folding(self):
             """x | (x & y) = x"""
