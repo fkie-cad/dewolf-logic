@@ -8,11 +8,9 @@ from simplifier.world.world import World
 def check_range_simplification(input_operation: str, output_operation: str):
     w = World()
     operation = w.from_string(input_operation)
-    print(str(operation))
     var = w.variable("v", 1)
     w.define(var, operation)
     RangeSimplifier.simplify(operation)
-    print(w.get_definition(var))
     assert w.compare(var, w.from_string(output_operation))
 
 
