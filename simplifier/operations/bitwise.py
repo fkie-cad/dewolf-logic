@@ -180,11 +180,11 @@ class CommonBitwiseAndOr(BitwiseOperation, CommutativeOperation, AssociativeOper
         Create the new condition that is equivalent to self and replace self by it.
 
         - if self is Or-operation and operation is a conjunction
-            self = (a1 & a2 & ... & ak) | l1 | l2 | ... | lh, where operation = (a1 & a2 & ... & ak),
+            self = A | l1 | l2 | ... | lh, where A = (a1 & a2 & ... & ak),
             remaining_conditions = [l1, l2, ..., lh] and each li is a condition
             -> new_condition = (a1 | l1 | ... |lh) & (a2 | l1 | ... |lh) & ... & (ak | l1 | ... |lh)
         -if self is And-operation and operation is a disjunction
-            self = (a1 | a2 | ... | ak) & l1 & l2 & ... & lh, where disjunction = (a1 | a2 | ... | ak),
+            self = A & l1 & l2 & ... & lh, where A = (a1 | a2 | ... | ak),
             remaining_conditions = [l1, l2, ..., lh] and each li is a condition
             -> new_condition = (a1 & l1 & ... & lh) | (a2 & l1 & ... & lh) | ... | (ak & l1 & ... & lh)
         """
