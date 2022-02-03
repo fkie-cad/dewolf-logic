@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from functools import reduce
 from itertools import combinations, permutations, product
 from operator import and_, lshift, neg, or_, rshift, xor
-from typing import TYPE_CHECKING, Dict, Iterator, List, Optional, Set, Tuple, Type, Union
+from typing import TYPE_CHECKING, Dict, Iterator, List, Optional, Set, Tuple, Type, TypeVar, Union
 
 from simplifier.common import T
 from simplifier.operations.interface import AssociativeOperation, CommutativeOperation, OrderedOperation, UnaryOperation
@@ -191,21 +191,21 @@ class CommonBitwiseAndOr(BitwiseOperation, CommutativeOperation, AssociativeOper
         conditions = []
         for literal in operation.operands:
             new_operands = [literal, *(cond.copy_tree() for cond in self.operands if hash(cond) != hash(operation))]
-            conditions.append(self.__class__(self.world).replace_operands(new_operands))
+            conditions.append(self.copy().replace_operands(new_operands))
         new_condition = self._negated_class(self.world).replace_operands(conditions)
         for cond in new_condition.operands:
             cond.simplify(keep_form=True)
         self.world.replace(self, new_condition)
         return new_condition
 
-    def get_junction(self):
+    def get_junction(self) -> Optional[Union[BitwiseAnd, BitwiseOr]]:
         """If the formula has a literal that is a junction of negated type, then return it, otherwise return None."""
         for child in self.operands:
             if isinstance(child, BitwiseNegate):
                 if resolved_neg := child.dissolve_negation():
                     child = resolved_neg
             if isinstance(child, self._negated_class):
-                return child
+                return child  # type: ignore
         return None
 
     @property
@@ -301,7 +301,7 @@ class CommonBitwiseAndOr(BitwiseOperation, CommutativeOperation, AssociativeOper
         neg_class = self._negated_class
         if not (common_suboperands := self._get_common_suboperands(neg_class)):
             return None
-        unique_operation_part = self.__class__(self.world)
+        unique_operation_part = self.copy()
         assert all(
             isinstance(operand, neg_class) for operand in self.children
         ), f"Since {self} has common suboperands, every operand must be of type {neg_class} or a BitVector."
