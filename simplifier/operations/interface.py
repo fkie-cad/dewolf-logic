@@ -57,7 +57,9 @@ class AssociativeOperation(Operation, ABC):
 
     def simplify(self, keep_form: bool = False) -> Optional[WorldObject]:
         """Simplify the operation by promoting single operands as well."""
-        super().simplify(keep_form)
+        simplified_operation = super().simplify(keep_form)
+        if simplified_operation is not None and simplified_operation != self:
+            return simplified_operation
         operands = self.operands
         operation = self._promote_single_operand()
         if len(operands) == 1:
@@ -117,7 +119,7 @@ class CommutativeOperation(Operation, ABC):
         Simplify the given operation.
 
         keep_form=True means that after the simplification the formula is still in CNF reps. DNF form it had this form before.
-        If the operand changes during the simplification, then we return the new operand..
+        If the operand changes during the simplification, then we return the new operand.
         """
         self._promote_subexpression()
         self._fold_constants()

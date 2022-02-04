@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from functools import reduce
 from itertools import combinations, permutations, product
 from operator import and_, lshift, neg, or_, rshift, xor
-from typing import TYPE_CHECKING, Dict, Iterator, List, Optional, Set, Tuple, Type, Union
+from typing import TYPE_CHECKING, Dict, Iterator, List, Optional, Set, Tuple, Type, TypeVar, Union
 
 from simplifier.common import T
 from simplifier.operations.interface import AssociativeOperation, CommutativeOperation, OrderedOperation, UnaryOperation
@@ -175,6 +175,39 @@ class CommonBitwiseAndOr(BitwiseOperation, CommutativeOperation, AssociativeOper
         self.world.replace(self, new_op)
         return new_op
 
+    def get_equivalent_condition_of_negated_type(self, operation: Union[BitwiseAnd, BitwiseOr]) -> Union[BitwiseAnd, BitwiseOr]:
+        """
+        Create the new condition that is equivalent to self and replace self by it.
+
+        - if self is Or-operation and operation is a conjunction
+            self = A | l1 | l2 | ... | lh, where A = (a1 & a2 & ... & ak),
+            remaining_conditions = [l1, l2, ..., lh] and each li is a condition
+            -> new_condition = (a1 | l1 | ... |lh) & (a2 | l1 | ... |lh) & ... & (ak | l1 | ... |lh)
+        -if self is And-operation and operation is a disjunction
+            self = A & l1 & l2 & ... & lh, where A = (a1 | a2 | ... | ak),
+            remaining_conditions = [l1, l2, ..., lh] and each li is a condition
+            -> new_condition = (a1 & l1 & ... & lh) | (a2 & l1 & ... & lh) | ... | (ak & l1 & ... & lh)
+        """
+        conditions = []
+        for literal in operation.operands:
+            new_operands = [literal, *(cond.copy_tree() for cond in self.operands if hash(cond) != hash(operation))]
+            conditions.append(self.copy().replace_operands(new_operands))
+        new_condition = self._negated_class(self.world).replace_operands(conditions)
+        for cond in new_condition.operands:
+            cond.simplify(keep_form=True)
+        self.world.replace(self, new_condition)
+        return new_condition
+
+    def get_junction(self) -> Optional[Union[BitwiseAnd, BitwiseOr]]:
+        """If the formula has a literal that is a junction of negated type, then return it, otherwise return None."""
+        for child in self.operands:
+            if isinstance(child, BitwiseNegate):
+                if resolved_neg := child.dissolve_negation():
+                    child = resolved_neg
+            if isinstance(child, self._negated_class):
+                return child  # type: ignore
+        return None
+
     @property
     @abstractmethod
     def _negated_class(self) -> Union[Type[BitwiseAnd], Type[BitwiseOr]]:
@@ -268,7 +301,7 @@ class CommonBitwiseAndOr(BitwiseOperation, CommutativeOperation, AssociativeOper
         neg_class = self._negated_class
         if not (common_suboperands := self._get_common_suboperands(neg_class)):
             return None
-        unique_operation_part = self.__class__(self.world)
+        unique_operation_part = self.copy()
         assert all(
             isinstance(operand, neg_class) for operand in self.children
         ), f"Since {self} has common suboperands, every operand must be of type {neg_class} or a BitVector."
@@ -445,36 +478,6 @@ class BitwiseOr(CommonBitwiseAndOr):
         e.g. (x & a) | (x & b) => x & (a | b)
         """
         return self._common_factorize()  # type: ignore
-
-    def get_equivalent_and_condition(self, conjunction: BitwiseAnd) -> BitwiseAnd:
-        """
-        Create the new And-condition that is equivalent to self and replace self by it.
-
-        - conjunction must be a term of the BitwiseOr formula self.
-
-        self = (a1 & a2 & .. & ak) | l1 | l2 | ... | lh, where conjunction = (a1 & a2 & .. & ak), remaining_conditions = [l1, l2, ..., lh]
-        and each li is a condition
-        -> new_condition = (a1 | l1 | ... |lh) & (a2 | l1 | ... |lh) & ... & (ak | l1 | ... |lh)
-        """
-        conditions = [
-            self.world.bitwise_or(arg, *(cond.copy_tree() for cond in self.operands if hash(cond) != hash(conjunction)))
-            for arg in conjunction.operands
-        ]
-        new_condition = self.world.bitwise_and(*conditions)
-        for cond in new_condition.operands:
-            cond.simplify(keep_form=True)
-        self.world.replace(self, new_condition)
-        return new_condition
-
-    def get_conjunction(self) -> Optional[BitwiseAnd]:
-        """If the Or-formula has a literal that is an conjunction, then return it, otherwise return None."""
-        for child in self.operands:
-            if isinstance(child, BitwiseNegate):
-                if resolved_neg := child.dissolve_negation():
-                    child = resolved_neg
-            if isinstance(child, BitwiseAnd):
-                return child
-        return None
 
     @property
     def _negated_class(self) -> Type[BitwiseAnd]:
