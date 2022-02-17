@@ -17,6 +17,17 @@ def run_test(test: str, result: str) -> bool:
     return w.compare(a, b)
 
 
+def run_test2(test: str, result: str) -> bool:
+    """Run the given test case."""
+    w = World()
+    a, b = w.variable("a", 32), w.variable("b", 32)
+    test_operation = w.from_string(test)
+    w.define(a, test_operation)
+    w.define(b, w.from_string(result))
+    a.simplify()  # type: ignore
+    return w.compare(a, b)
+
+
 def run_negation_test(test: str, result: str, level: Optional[int]) -> bool:
     """Run the given test case."""
     w = World()
@@ -41,6 +52,35 @@ class TestNot:
     def test_nesting(self, test: str, result: str):
         assert run_test(test, result)
 
+    @pytest.mark.parametrize(
+        "test, result",
+        [
+            ("(! (== x@1 0@1))", "(!= x@1 0@1)"),
+        ],
+    )
+    def test_factorize(self, test: str, result: str):
+        assert run_test(test, result)
+
+    @pytest.mark.parametrize(
+        "test, result",
+        [
+            ("(! (| (== x@32 0@32) (!= x@32 0@32)))", "0@32"),
+            ("(! (| (!= x@32 0@32) (== x@32 0@32)))", "0@32"),
+        ],
+    )
+    def test_folding(self, test: str, result: str):
+        assert run_test2(test, result)
+
+    @pytest.mark.parametrize(
+        "test, result",
+        [("(! (== 1@32 1@32))", "0@32"), ("(! (== 0@32 0@32))", "0@32"), ("(! (== x@32 1@32 1@32 1@32 1@32))", "(! (== x@32 1@32))")],
+    )
+    def test_multifold(self, test: str, result: str):
+        w = World()
+        test_operation = w.from_string(test)
+        a = test_operation.simplify()  # type: ignore
+        return w.compare(a, w.from_string(result))
+
 
 class TestRelations:
     """Class implementing tests for Relation Operations."""
@@ -50,6 +90,8 @@ class TestRelations:
         [
             ("(== 1@1 1@1)", "1@1"),
             ("(== 1@1 0@1)", "0@1"),
+            ("(== 1@32 1@32)", "1@32"),
+            ("(== 0@32 0@32)", "1@32"),
             ("(== 1@1 0@1 x@1)", "0@1"),
             ("(== x@1 x@1)", "1@1"),
             ("(u<= x@1 x@1)", "1@1"),
@@ -107,6 +149,16 @@ class TestRelations:
     )
     def test_simplify(self, test: str, result: str):
         assert run_test(test, result)
+
+    @pytest.mark.parametrize(
+        "test, result",
+        [
+            ("(| (== x@32 0@32) (!= x@32 0@32))", "1@32"),
+            ("(| (!= x@32 0@32) (== x@32 0@32))", "1@32"),
+        ],
+    )
+    def test_complex_fold(self, test: str, result: str):
+        assert run_test2(test, result)
 
     @pytest.mark.parametrize(
         "test, result",

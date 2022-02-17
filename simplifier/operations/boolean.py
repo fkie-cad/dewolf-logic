@@ -37,7 +37,7 @@ class Not(BooleanOperation, UnaryOperation):
     def factorize(self) -> Optional[Operation]:
         """Resolve the negation, if possible."""
         if self.operand.__class__ in BOOLEAN_NEGATIONS:
-            return BOOLEAN_NEGATIONS[self.operand.__class__](self.world)
+            return BOOLEAN_NEGATIONS[self.operand.__class__](self.world).replace_operands(self.operand.operands)  # type: ignore
         if isinstance(self.operand, Not):
             return self.operand.operand  # type: ignore
         return None
