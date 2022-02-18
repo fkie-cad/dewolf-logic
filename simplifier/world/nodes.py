@@ -119,13 +119,6 @@ class BaseVariable(BitVector, ABC):
         for node in list(self.world.iter_postorder(self)):
             if isinstance(node, Operation):
                 RangeSimplifier.simplify(node)
-                from simplifier.operations.interface import AssociativeOperation, CommutativeOperation
-
-                if isinstance(node, (AssociativeOperation, CommutativeOperation)):
-                    node._promote_single_operand()
-        for node in list(self.world.iter_postorder(self)):
-            if isinstance(node, Operation):
-                node.simplify()
 
 
 class Variable(BaseVariable):
