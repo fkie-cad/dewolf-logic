@@ -24,7 +24,7 @@ class ArithmeticOperation(Operation, ABC):
         """Return a boolean describing whether this operation interprets sign bits."""
 
     @dirty
-    def fold(self):
+    def fold(self, keep_form: bool = False):
         """
         Fold all constant operands utilizing the eval method.
 
