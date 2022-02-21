@@ -37,6 +37,7 @@ class TestAddition:
             ("(u+ x@8 8@8 8@16)", "(u+ x@8 16@16)"),
             ("(s+ x@8 8@8 8@16)", "(s+ x@8 16@16)"),
             ("(s+ x@8 -1@8 8@8)", "(u+ x@8 7@18)"),
+            ("(s+ var_10@32 ecx_1@32)", "(s+ var_10@32 ecx_1@32)"),
         ],
     )
     def test_fold_constants(self, test: str, result: str):
@@ -109,6 +110,7 @@ class TestSubtraction:
             ("(u- x@8 8@8 3@16)", "(u- x@8 5@16)"),
             ("(s- x@8 -1@8 7@16)", "(s- x@8 -8@16)"),
             ("(s- x@8 16@8 -5@8)", "(u- x@8 21@18)"),
+            ("(s- var_10@32 ecx_1@32)", "(s- var_10@32 ecx_1@32)"),
         ],
     )
     def test_fold_constants(self, test: str, result: str):
@@ -179,6 +181,7 @@ class TestModulo:
             ("(u% x@8 8@8 3@16)", "(u% x@8 2@16)"),
             ("(s% x@8 8@8 8@16)", "(u% x@8 0@16)"),
             ("(s% x@8 -1@8 8@16)", "(s% x@8 -1@16)"),
+            ("(s% var_10@32 ecx_1@32)", "(s% var_10@32 ecx_1@32)"),
         ],
     )
     def test_fold_constants(self, test: str, result: str):
@@ -241,6 +244,7 @@ class TestMultiplication:
             ("(s* x@8 8@8 8@16)", "(s* x@8 64@16)"),
             ("(s* x@8 -8@8 -8@16)", "(s* x@8 64@16)"),
             ("(s* x@8 -1@8 8@16)", "(s* x@8 -8@16)"),
+            ("(s* var_10@32 ecx_1@32)", "(s* var_10@32 ecx_1@32)"),
         ],
     )
     def test_fold_constants(self, test: str, result: str):
@@ -297,6 +301,7 @@ class TestDivision:
             ("(s/ x@8 -8@8 -8@16)", "(u/ x@8 1@16)"),
             ("(s/ x@8 8@16 -1@8)", "(s/ x@8 -8@16)"),
             ("(s/ x@8 8.0@16 -1@8)", "(s/ x@8 -8.0@18)"),
+            ("(s/ var_10@32 ecx_1@32)", "(s/ var_10@32 ecx_1@32)"),
         ],
     )
     def test_fold_constants(self, test: str, result: str):

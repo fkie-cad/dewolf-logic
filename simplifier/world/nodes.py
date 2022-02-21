@@ -110,13 +110,15 @@ class BaseVariable(BitVector, ABC):
     def simplify(self):
         """Simplify the term defined by the variable."""
         from simplifier.operations import BitwiseNegate
+        from simplifier.range_simplifier import RangeSimplifier
 
         for node in list(self.world.iter_postorder(self)):
             if isinstance(node, BitwiseNegate):
                 node.dissolve_negation()
+
         for node in list(self.world.iter_postorder(self)):
             if isinstance(node, Operation):
-                node.simplify()
+                RangeSimplifier.simplify(node)
 
 
 class Variable(BaseVariable):
