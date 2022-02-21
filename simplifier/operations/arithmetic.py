@@ -30,10 +30,11 @@ class ArithmeticOperation(Operation, ABC):
 
         e.g. 2*x + 4 + 3 + 8*x = 2*x + 7 + 8*x
         """
-        new_constant = self.eval(self.constants)
-        for constant in self.constants:
-            self.remove_operand(constant)
-        self.add_operand(new_constant)
+        if len(self.constants) > 0:
+            new_constant = self.eval(self.constants)
+            for constant in self.constants:
+                self.remove_operand(constant)
+            self.add_operand(new_constant)
 
 
 class BaseDivision(ArithmeticOperation, OrderedOperation, ABC):
