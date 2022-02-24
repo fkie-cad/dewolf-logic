@@ -137,6 +137,8 @@ class BitwiseOrRangeSimplifier:
 class RangeSimplifier:
     """Class in charge of simplifying ranges."""
 
+    SIMPLIFIABLE_OPERANDS = (Relation, BitwiseAnd, BitwiseOr)
+
     def __init__(self, operation: WorldObject):
         """Initialize a new object of the range simplifier to simplify the given world-object."""
         self._world: World = operation.world
@@ -183,14 +185,19 @@ class RangeSimplifier:
 
     @property
     def can_be_simplified(self) -> bool:
-        """Check whether the operand is still simplifiable."""
+        """Check whether the operand is simplifiable."""
         return isinstance(self._world.get_definition(self._defining_variable), Operation)
+
+    @property
+    def can_be_ranged_simplified(self) -> bool:
+        """Check whether the operand is still simplifiable for range simplification."""
+        return isinstance(self._world.get_definition(self._defining_variable), self.SIMPLIFIABLE_OPERANDS)
 
     def _simplify_operation(self) -> bool:
         """Simplifies the operation if possible and check whether it can still be simplified after the simplification."""
         if self.can_be_simplified:
             self.get_operation.simplify()
-        return self.can_be_simplified
+        return self.can_be_ranged_simplified
 
     def _split_non_binary_relations(self):
         """Split non-binary relations into binary relations."""

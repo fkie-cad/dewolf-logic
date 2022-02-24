@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 from simplifier.world.graphs.interface import NODE, GraphEdgeInterface
-from simplifier.world.nodes import Operation, Variable, WorldObject
+from simplifier.world.nodes import BaseVariable, Operation, WorldObject
 
 
 class WorldRelation(GraphEdgeInterface, ABC):
@@ -50,7 +50,7 @@ class WorldRelation(GraphEdgeInterface, ABC):
 class DefinitionEdge(WorldRelation):
     """Class representing an edge between a variable and its definition."""
 
-    _source: Variable
+    _source: BaseVariable
 
     @property
     def index(self) -> int:
@@ -58,7 +58,7 @@ class DefinitionEdge(WorldRelation):
         return 0
 
     @property
-    def variable(self) -> Variable:
+    def variable(self) -> BaseVariable:
         """Return the variable being defined by the edge."""
         return self._source
 
@@ -69,7 +69,7 @@ class DefinitionEdge(WorldRelation):
 
     def copy(self, source: Optional[NODE] = None, sink: Optional[NODE] = None) -> DefinitionEdge:
         """Generate a copy of the edge with updated fields."""
-        assert not source or isinstance(source, Variable)
+        assert not source or isinstance(source, BaseVariable)
         assert not sink or isinstance(sink, WorldObject)
         return DefinitionEdge(
             self.variable if not source else source,  # type: ignore
