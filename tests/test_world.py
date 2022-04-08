@@ -209,6 +209,26 @@ class TestCleanUp:
         assert World.compare(w.from_string("v"), cmp_w.from_string("v")) and len(w) == numb_vertices
 
     @pytest.mark.parametrize(
+        "term1, term2, output, numb_vertices",
+        [
+            ("w@4 = (& (| x@4 a@4) (| x@4 b@4))", "v@4 = (& (| (~x@4) a@4) (| x@4 c@4))", "v@4 = (& (| (~x@4) a@4) (| x@4 c@4))", 9),
+            ("(~1@3)", "w@4 = (~x@4)", "x@4", 1),
+            ("w@4 = (~z@4)", "(Tmp)u@4 = (>> x@8 y@8)", "z@4", 3),
+            ("(Tmp)u@4 = (~x@4)", "w@4 = (~x@4)", "x@4", 1),
+        ],
+    )
+    def test_remove_additionally_variables(self, term1, term2, output, numb_vertices):
+        w = World()
+        w.from_string(term1)
+        w.from_string(term2)
+        w.cleanup([w.variable("w", 4)])
+        cmp_w = World()
+        cmp_w.from_string(output)
+        leaf = cmp_w.terms()[0]
+        assert isinstance(leaf, Variable)
+        assert World.compare(w.from_string(leaf.name), leaf) and len(w) == numb_vertices
+
+    @pytest.mark.parametrize(
         "shared_operand, numb_vertices",
         [
             ("(& (| x@4 a@4) (| x@4 b@4))", 7),

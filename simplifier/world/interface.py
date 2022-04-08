@@ -162,9 +162,11 @@ class WorldInterface:
         """Return the relation between two nodes."""
         return self._graph.get_edges(node1, node2)
 
-    def cleanup(self):
-        """Remove all orphaned nodes in the graph. This are all nodes not reachable from a defining variable."""
+    def cleanup(self, additionally_remove: Optional[Iterable[BaseVariable]] = None):
+        """Remove all orphaned nodes in the graph. These are all nodes not reachable from a defining variable."""
         removable_nodes = {node for node in self.terms() if not isinstance(node, Variable)}
+        if additionally_remove:
+            removable_nodes.update(additionally_remove)
         while removable_nodes:
             current_node = removable_nodes.pop()
             for child in self._graph.get_successors(current_node):
