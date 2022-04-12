@@ -8,6 +8,7 @@ from operator import and_, lshift, neg, or_, rshift, xor
 from typing import TYPE_CHECKING, Dict, Iterator, List, Optional, Set, Tuple, Type, TypeVar, Union
 
 from simplifier.common import T
+from simplifier.operations.boolean import BOOLEAN_NEGATIONS, Relation
 from simplifier.operations.interface import AssociativeOperation, CommutativeOperation, OrderedOperation, UnaryOperation
 from simplifier.util.decorators import dirty
 from simplifier.world.nodes import BitVector, Constant, Operation, Variable, WorldObject
@@ -336,6 +337,8 @@ class CommonBitwiseAndOr(BitwiseOperation, CommutativeOperation, AssociativeOper
         if isinstance(term, BitwiseOr):
             operands = [op.operand if isinstance(op, BitwiseNegate) else self.world.bitwise_negate(op) for op in term.operands]
             return self.world.bitwise_and(*operands)
+        if isinstance(term, Relation):
+            return BOOLEAN_NEGATIONS[term.__class__](self.world).replace_operands(term.operands)
 
         return None
 

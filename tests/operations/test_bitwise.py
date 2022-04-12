@@ -164,6 +164,14 @@ class TestBitwiseAnd:
             w.simplify()
             assert World.compare(v, w.from_string("(& (| (~ x@1) (~ y@1) ) z@1)"))
 
+        def test_associative_fold_8(self):
+            """(v < 4) & ((v >= 4) | (x == 3 & y == 2)) = (v < 4) & (x == 3) & (y == 2)"""
+            w = World()
+            cond = w.from_string("(& (u< v@4 4@4) (| (u>= v@4 4@4) (& (== x@4 3@4) (== y@4 2@4))) )")
+            w.define(var := w.variable("var", 1), cond)
+            w.simplify()
+            assert World.compare(var, w.from_string("(& (u< v@4 4@4) (== x@4 3@4) (== y@4 2@4) )"))
+
     @pytest.mark.parametrize(
         "lhs, rhs",
         [
