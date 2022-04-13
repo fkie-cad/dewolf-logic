@@ -161,8 +161,10 @@ class ExpressionValues:
     def _refine_bounds_using_forbidden_values(self) -> None:
         """Refine the upper and lower bounds considering the forbidden values."""
         while self.upper_bound.contained_in(self.forbidden_values) or self.lower_bound.contained_in(self.forbidden_values):
-            self.upper_bound.modify_if_contained_in(self.forbidden_values, -1)
-            self.lower_bound.modify_if_contained_in(self.forbidden_values, 1)
+            if self.upper_bound.modify_if_contained_in(self.forbidden_values, -1):
+                self._add_must_value_if_values_are_equal(self.upper_bound, self.size_lower_bound)
+            if self.lower_bound.modify_if_contained_in(self.forbidden_values, 1):
+                self._add_must_value_if_values_are_equal(self.lower_bound, self.size_upper_bound)
 
     def _remove_redundant_forbidden_values(self) -> None:
         """Remove redundant forbidden values, i.e., values that are already forbidden due to the upper and lower bounds."""

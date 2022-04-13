@@ -5,12 +5,12 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Dict, Iterator, List, Optional, Type, Union
 
 from simplifier.common import T
-from simplifier.operations import BitwiseAnd
 from simplifier.operations.interface import OrderedOperation, UnaryOperation
 from simplifier.util.decorators import dirty
 from simplifier.world.nodes import BitVector, Constant, Operation, WorldObject
 
 if TYPE_CHECKING:
+    from simplifier.operations import BitwiseAnd
     from simplifier.visitor import WorldObjectVisitor
 
 

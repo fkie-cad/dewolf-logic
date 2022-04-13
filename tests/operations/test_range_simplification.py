@@ -454,3 +454,17 @@ def test_check_clean_up_works(test, result, numb_vertices):
 )
 def test_range_simplification_mixed_signedness(test, result):
     check_range_simplification(test, result)
+
+
+@pytest.mark.parametrize(
+    "test, result",
+    [
+        ("(& (u<= x@8 1@8) (!= x@8 1@8) (!= x@8 0@8))", "0@1"),
+        ("(& (u< x@8 1@8) (!= x@8 0@8))", "0@1"),
+        ("(& (u> x@3 5@3) (!= x@3 6@3) (!= x@3 7@3))", "0@1"),
+        ("(& (s< x@3 -2@3) (!= x@3 -3@3) (!= x@3 -4@3))", "0@1"),
+        ("(& (s>= x@3 2@3) (!= x@3 2@3) (!= x@3 3@3))", "0@1"),
+    ],
+)
+def test_range_simplification_out_of_bound(test, result):
+    check_range_simplification(test, result)
